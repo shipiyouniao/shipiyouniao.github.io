@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="refresh" content="5;url=/minefarer/">
+    <meta name="robots" content="noindex">
+    <title>Minefarer — the adventure has moved</title>
+    <style>
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #eaf0eb; color: #263c34; font: 16px/1.7 system-ui, sans-serif; }
+      main { max-width: 32rem; margin: 24px; padding: 32px; border: 1px solid #a8bcb052; border-radius: 20px; background: #f8fbf8; }
+      h1 { margin: 0 0 12px; font-size: 30px; } a { color: #246e59; }
+    </style>
+  </head>
+  <body>
+    <main><h1>Minefarer</h1><p>Minesweeper 2.0 has a new name. Taking you to the adventure…</p><a id="destination" href="/minefarer/">Continue to Minefarer →</a></main>
+    <script>
+      // A fixed same-origin destination preserves saved data and cannot become an open redirect.
+      const destination = new URL('/minefarer/', location.origin);
+      destination.search = location.search;
+      destination.hash = location.hash;
+      document.querySelector('#destination').href = destination.href;
+      location.replace(destination.href);
+    </script>
+  </body>
+</html>
