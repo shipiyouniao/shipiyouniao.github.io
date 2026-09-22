@@ -47,6 +47,7 @@ export const stack = [
   ["frontend", "Vue 3", "TypeScript", "Vite", "Tailwind CSS"],
   ["backend", "C# / .NET", "Java", "Python", "Go", "Rust"],
   ["systems", "C++", "CUDA", "PyTorch", "vLLM", "SGLang"],
+  ["foundations", "foundationMl", "foundationDl", "foundationGraphics"],
   ["infra", "Linux", "Docker", "Kubernetes"],
   [
     "data",

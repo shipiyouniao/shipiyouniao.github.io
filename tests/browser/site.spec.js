@@ -109,8 +109,20 @@ for (const language of ["zh-CN", "en-US"]) {
         await expect(page.locator(".experience-company")).toContainText(
           zh ? "2025 年 6 月 25 日" : "June 25, 2025",
         );
-        await expect(page.locator(".education-section")).toContainText(
-          zh ? "成都信息工程大学" : "Chengdu University",
+        await expect(
+          page.getByRole("region", {
+            name: zh ? "教育与在校经历" : "Education & campus experience",
+            exact: true,
+          }),
+        ).toContainText(zh ? "成都信息工程大学" : "Chengdu University");
+        await expect(
+          page.locator('[aria-labelledby="learning-path"]'),
+        ).toContainText(zh ? "模型训练" : "model training");
+        await expect(page.locator(".experience-period").first()).toContainText(
+          zh ? "2026.03 至今" : "Mar 2026–present",
+        );
+        await expect(page.locator(".stack-table")).toContainText(
+          zh ? "计算机图形学" : "Computer graphics",
         );
         await expect(page.locator(".about-lead img")).toHaveJSProperty(
           "complete",

@@ -291,7 +291,9 @@ function dateLabel(date) {
         <span class="experience-period">{{ t("current") }}</span>
         <div>
           <h3>{{ t("sccTitle") }}</h3>
-          <p>{{ t("sccBody") }}</p>
+          <p v-for="(paragraph, index) in tm('sccBody')" :key="index">
+            {{ rt(paragraph) }}
+          </p>
         </div>
       </div>
       <div class="experience-row">
@@ -342,8 +344,14 @@ function dateLabel(date) {
         </div>
       </div>
     </section>
-    <section class="education-section">
-      <h2>{{ t("education") }}</h2>
+    <section class="education-section" aria-labelledby="learning-path">
+      <h2 id="learning-path">{{ t("learningTitle") }}</h2>
+      <p v-for="(paragraph, index) in tm('learningBody')" :key="index">
+        {{ rt(paragraph) }}
+      </p>
+    </section>
+    <section class="education-section" aria-labelledby="education-history">
+      <h2 id="education-history">{{ t("education") }}</h2>
       <h3>{{ t("university") }}</h3>
       <p>{{ t("degree") }}</p>
       <div class="mt-7">
@@ -362,7 +370,9 @@ function dateLabel(date) {
       <div v-for="[key, ...items] in stack" :key="key">
         <h3>{{ t(key) }}</h3>
         <p>
-          <span v-for="item in items" :key="item">{{ item }}</span>
+          <span v-for="item in items" :key="item">{{
+            key === "foundations" ? t(item) : item
+          }}</span>
         </p>
       </div>
     </div>

@@ -194,11 +194,23 @@ export default {
       "也参与相关贡献的评审与集成，补充复现条件、源码分析和实机验证，区分已经验证的结果与尚待覆盖的场景。",
     ],
     joined: "深信服 · 2025 年 6 月 25 日入职",
-    current: "目前",
+    current: "2026.03 至今",
     sccTitle: "深信服分布式云（SCC）· 前沿技术团队",
-    sccBody:
+    sccBody: [
       "负责智算产品 AI Infra 方向的技术预研与版本落地，围绕大模型推理基础设施推动方案从验证进入产品。",
-    previous: "此前",
+      "主要攻坚成果包括模型权重共享、KV Cache 池化等显存复用能力，以及弹性调度策略，推动这些能力在产品中落地。",
+    ],
+    previous: "2025.06–2026.02",
+    foundations: "理论基础",
+    foundationMl: "机器学习基础",
+    foundationDl: "深度学习基础",
+    foundationGraphics: "计算机图形学",
+    learningTitle: "从 AI 应用走向推理基础设施",
+    learningBody: [
+      "2026 年 3 月以前，我的 AI 经历主要是使用 AI 工具和开发 Agent，还没有接触神经网络底层。转向智算后，我花了一个月重新拾起大一学过、此后几年没有系统使用的线性代数、概率论与数理统计，集中补齐 AI Infra 工作所需的机器学习和深度学习知识。",
+      "学习和工程实践是一起推进的：从阅读推理引擎源码、追踪显存与执行路径，到构造复现、修复问题并提交经过验证的 PR，逐步参与 KVCached 等推理基础设施的质量改进。",
+      "目前正在进一步学习模型训练，希望把对推理系统的理解延伸到训练过程。我也有计算机图形学理论基础，关注数学、底层执行与实际工程之间的联系。",
+    ],
     scpTitle: "SCP 私有云平台 · 基础架构团队",
     scpBody: [
       "负责监控系统，带领两位外包驻场同事组成开发小组，将全系统 Round Robin Database（RRD）存储迁移至 VictoriaMetrics。",
@@ -428,11 +440,23 @@ export default {
       "I also review and integrate related contributions, documenting reproduction conditions, source-level analysis and hardware validation while distinguishing verified results from scenarios that still need coverage.",
     ],
     joined: "Sangfor Technologies · Joined June 25, 2025",
-    current: "Current",
+    current: "Mar 2026–present",
     sccTitle: "Sangfor Cloud-service Center (SCC) · Emerging Technology Team",
-    sccBody:
+    sccBody: [
       "Responsible for AI infrastructure research and product delivery for intelligent computing, taking LLM inference infrastructure from validation into releases.",
-    previous: "Previously",
+      "Key work includes model weight sharing, KV cache pooling and other GPU memory reuse capabilities, alongside elastic scheduling strategies, bringing these capabilities into the product.",
+    ],
+    previous: "Jun 2025–Feb 2026",
+    foundations: "Foundations",
+    foundationMl: "Machine learning fundamentals",
+    foundationDl: "Deep learning fundamentals",
+    foundationGraphics: "Computer graphics",
+    learningTitle: "From AI applications to inference infrastructure",
+    learningBody: [
+      "Before March 2026, my AI experience was primarily using AI tools and developing agents, rather than working with neural-network internals. Moving into AI infrastructure, I spent a month revisiting linear algebra, probability and mathematical statistics that I had studied in my first university year but had not used systematically for years, alongside the machine learning and deep learning knowledge needed for infrastructure work.",
+      "Learning and engineering progressed together: reading inference-engine source, tracing memory and execution paths, building reproducers, and contributing verified fixes to improve the quality of inference infrastructure such as KVCached.",
+      "I am now studying model training to extend that understanding beyond inference. I also have a theoretical foundation in computer graphics and enjoy connecting mathematics with low-level execution and practical engineering.",
+    ],
     scpTitle: "SCP (Sangfor Cloud Platform) · Infrastructure Team",
     scpBody: [
       "Led a development team with two on-site contract engineers to migrate the platform's monitoring storage from Round Robin Database (RRD) to VictoriaMetrics.",
