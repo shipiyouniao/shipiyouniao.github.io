@@ -25,5 +25,5 @@ test('legacy entry points preserve query and fragment while replacing browser hi
 test('the legacy directory and index entry include a no-script fallback', () => {
   assert.match(primary, /http-equiv="refresh" content="5;url=\/minefarer\/"/)
   assert.match(primary, /id="destination" href="\/minefarer\/"/)
-  assert.ok(readFileSync('site/index.html', 'utf8').includes('href="/minefarer/"'))
+  assert.ok(readFileSync('index.html', 'utf8').includes('href="/minefarer/"'))
 })

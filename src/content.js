@@ -1,0 +1,65 @@
+export const contributions = [
+  {
+    slug: "allocator-snapshots",
+    repo: "KVCached",
+    number: 443,
+    date: "2026-08-17",
+    url: "https://github.com/ovg-project/kvcached/pull/443",
+  },
+  {
+    slug: "shared-gpu-startup",
+    repo: "KVCached",
+    number: 448,
+    date: "2026-08-20",
+    url: "https://github.com/ovg-project/kvcached/pull/448",
+  },
+  {
+    slug: "inference-mode",
+    repo: "KVCached",
+    number: 461,
+    date: "2026-08-23",
+    url: "https://github.com/ovg-project/kvcached/pull/461",
+  },
+  {
+    slug: "prefix-cache",
+    repo: "KVCached",
+    number: 402,
+    date: "2026-08-06",
+    url: "https://github.com/ovg-project/kvcached/pull/402",
+  },
+  {
+    slug: "observability",
+    repo: "KVCached",
+    number: 385,
+    date: "2026-08-08",
+    url: "https://github.com/ovg-project/kvcached/pull/385",
+  },
+  {
+    slug: "worker-rpc",
+    repo: "vLLM",
+    number: 51979,
+    date: "2026-08-24",
+    url: "https://github.com/vllm-project/vllm/pull/51979",
+  },
+];
+export const bilibili = "https://space.bilibili.com/30915729";
+export const stack = [
+  ["frontend", "Vue 3", "TypeScript", "Vite", "Tailwind CSS"],
+  ["backend", "C# / .NET", "Java", "Python", "Go", "Rust"],
+  ["systems", "C++", "CUDA", "PyTorch", "vLLM", "SGLang"],
+  ["infra", "Linux", "Docker", "Kubernetes"],
+  [
+    "data",
+    "MySQL",
+    "Oracle",
+    "SQL Server",
+    "SQLite",
+    "PostgreSQL",
+    "MongoDB",
+    "ClickHouse",
+  ],
+  ["monitoring", "VictoriaMetrics", "Prometheus", "Grafana"],
+  ["games", "Unity", "C#"],
+  ["embedded", "STM32"],
+  ["native", "Objective-C", "Swift", "Java", "Kotlin", "ArkTS"],
+];
