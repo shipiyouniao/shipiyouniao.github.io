@@ -448,7 +448,11 @@ function dateLabel(date) {
           </div>
           <ArrowUpRight :size="18" />
         </a>
-        <a :href="bilibili" target="_blank" rel="noopener noreferrer">
+        <a
+          href="https://www.bilibili.com/read/mobile-readlist/rl17559"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
           <Gamepad2 :size="22" />
           <div>
             <small>{{ t("biliGuide") }}</small>
