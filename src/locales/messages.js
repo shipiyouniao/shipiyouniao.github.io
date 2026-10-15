@@ -1,5 +1,31 @@
 export default {
   zh: {
+    "incremental-eviction": {
+      title: "释放一个块，为什么要扫描整个缓存池？",
+      summary: "用增量页索引缩短缓存淘汰热路径，保留原有容量上限与淘汰策略。",
+      problem: "每次缓存裁剪都重新分组和排序全部可淘汰块。",
+      change: "仅刷新变化的页，按代价与近期使用顺序选择候选。",
+      evidence:
+        "T4 单块裁剪微基准从约 260 微秒降至约 20 微秒，不等于推理吞吐提升。",
+    },
+    "async-unmap": {
+      title: "请求结束了，GPU 为什么还不能释放这页？",
+      summary:
+        "让物理 unmap 排在已入队的 Worker 工作之后，消除逻辑释放与异步执行的错位。",
+      problem: "后续批次仍持有 block table，物理页却已被撤销映射。",
+      change: "先记录退休页，再通过 Worker 队列屏障确认安全释放。",
+      evidence:
+        "真实 CUDA 映射故障注入与单 T4 服务 A/B 验证，明确区分多卡与退出阶段边界。",
+    },
+    "hybrid-retry": {
+      title: "可以重试，不代表状态已经回到了重试之前",
+      summary:
+        "修复混合缓存分配失败后的残留状态，以及异步 decode 重复发布旧 Mamba 边界的问题。",
+      problem: "后一个缓存组分配失败时，前一个组可能已移动哈希并排入复制任务。",
+      change: "只撤销本轮未发布的分配，并阻止运行态覆盖旧检查点。",
+      evidence:
+        "vLLM 0.28/0.29 原生管理器测试及 T4 tiny hybrid 故障恢复，未扩展为完整模型质量结论。",
+    },
     name: "石皮幼鸟",
     home: "首页",
     notes: "PR 手记",
@@ -111,7 +137,7 @@ export default {
     biliVisit: "去 Bilibili 找我",
     biliRhythm: "音游记录",
     biliGuide: "游戏攻略",
-    biliVideo1: "IIDX · XHRONOXAPSULΞ (SPL 12) H-CLEAR",
+    biliVideo1: "IIDX · 全皿皆传（EMERALDAS组）",
     biliVideo2: "《魔女之泉》多结局攻略",
     biliWatch: "观看视频",
     description: "石皮幼鸟的个人主页：全栈开发、开源贡献与游戏视频。",
@@ -232,6 +258,39 @@ export default {
     ],
   },
   en: {
+    "incremental-eviction": {
+      title: "Why scan the whole cache to free one block?",
+      summary:
+        "An incremental page index shortens eviction work without changing the cache cap or victim policy.",
+      problem: "Each trim regrouped and sorted the entire evictable pool.",
+      change:
+        "Refresh changed pages and select candidates by cost and recency.",
+      evidence:
+        "T4 single-block trim microbenchmarks fell from about 260 to 20 microseconds, not a serving-throughput claim.",
+    },
+    "async-unmap": {
+      title: "The request finished. Why is this GPU page still in use?",
+      summary:
+        "Order physical unmap after queued worker work instead of treating logical release as GPU completion.",
+      problem:
+        "A queued batch can retain a block table after its backing page is unmapped.",
+      change:
+        "Retire empty pages, then establish a worker-queue barrier before release.",
+      evidence:
+        "Real CUDA fault probes and single-T4 serving A/B, with explicit multi-rank and shutdown limitations.",
+    },
+    "hybrid-retry": {
+      title:
+        "A retry is only safe if the previous attempt left no broken state",
+      summary:
+        "Recover partial hybrid-cache allocations and prevent stale Mamba checkpoint publication during async decode.",
+      problem:
+        "An earlier group may move hashes and queue copies before a later group fails allocation.",
+      change:
+        "Undo only the unpublished attempt and protect the existing checkpoint boundary.",
+      evidence:
+        "Native vLLM 0.28/0.29 tests and T4 tiny-hybrid recovery checks, not full-model quality qualification.",
+    },
     name: "shipiyouniao",
     home: "Home",
     notes: "PR notes",
@@ -347,7 +406,7 @@ export default {
     biliVisit: "Visit my Bilibili",
     biliRhythm: "Rhythm games",
     biliGuide: "Walkthroughs",
-    biliVideo1: "IIDX · XHRONOXAPSULΞ (SPL 12) H-CLEAR",
+    biliVideo1: "IIDX · All-Scratch Kaiden (EMERALDAS course)",
     biliVideo2: "WitchSpring · Multiple-ending walkthrough",
     biliWatch: "Watch video",
     description:

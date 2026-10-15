@@ -224,7 +224,7 @@ function dateLabel(date) {
       </div>
       <div class="contribution-list">
         <a
-          v-for="item in [402, 385, 443].map((number) =>
+          v-for="item in [538, 464, 518].map((number) =>
             contributions.find(
               (item) => item.repo === 'KVCached' && item.number === number,
             ),
@@ -471,7 +471,7 @@ function dateLabel(date) {
           <ArrowUpRight :size="18" />
         </a>
         <a
-          href="https://www.bilibili.com/video/BV1Xzea6vEn8/"
+          href="https://www.bilibili.com/video/BV1zwaD6dErb/"
           target="_blank"
           rel="noopener noreferrer"
           ><Music2 :size="22" />

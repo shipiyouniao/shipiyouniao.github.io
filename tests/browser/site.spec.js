@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { contributions } from "../../src/content.js";
 
 async function selectLanguage(page, language) {
   await page.getByTestId("language").click();
@@ -40,6 +41,20 @@ for (const language of ["zh-CN", "en-US"]) {
           "href",
           "https://space.bilibili.com/30915729",
         );
+        await expect(
+          page.locator(
+            'a[href="https://www.bilibili.com/video/BV1zwaD6dErb/"]',
+          ),
+        ).toContainText(zh ? "全皿皆传" : "All-Scratch Kaiden");
+        await expect(page.locator(".note-card")).toHaveCount(3);
+        for (const slug of [
+          "hybrid-retry",
+          "async-unmap",
+          "incremental-eviction",
+        ])
+          await expect(
+            page.locator(`.note-card[href="#/notes/${slug}"]`),
+          ).toBeVisible();
         await page.locator(".project-image img").scrollIntoViewIfNeeded();
         await page
           .locator(".project-image img")
@@ -55,7 +70,9 @@ for (const language of ["zh-CN", "en-US"]) {
             exact: true,
           })
           .click();
-        await expect(page.locator(".note-card")).toHaveCount(6);
+        await expect(page.locator(".note-card")).toHaveCount(
+          contributions.length,
+        );
         await page.getByRole("searchbox").fill("51979");
         await expect(page.locator(".note-card")).toHaveCount(1);
         await page.locator(".note-card").click();

@@ -41,6 +41,27 @@ export const contributions = [
     date: "2026-08-24",
     url: "https://github.com/vllm-project/vllm/pull/51979",
   },
+  {
+    slug: "hybrid-retry",
+    repo: "KVCached",
+    number: 518,
+    date: "2026-09-28",
+    url: "https://github.com/ovg-project/kvcached/pull/518",
+  },
+  {
+    slug: "async-unmap",
+    repo: "KVCached",
+    number: 464,
+    date: "2026-09-29",
+    url: "https://github.com/ovg-project/kvcached/pull/464",
+  },
+  {
+    slug: "incremental-eviction",
+    repo: "KVCached",
+    number: 538,
+    date: "2026-10-06",
+    url: "https://github.com/ovg-project/kvcached/pull/538",
+  },
 ];
 export const bilibili = "https://space.bilibili.com/30915729";
 export const stack = [
