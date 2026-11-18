@@ -14,9 +14,9 @@ A->>B: Read free
 B-->>A: Values may describe different states
 ```
 
-## One counter for scheduling, one snapshot for monitoring
+## Reading one counter or taking a snapshot
 
-The scheduler often needs only the free-page count. It can now read that counter atomically without waiting for the allocator lock. When monitoring needs the total, free, in-use and reserved counts together, it calls `get_page_state()` and reads those four counters under one lock. It reads available physical capacity separately.
+The free-page getter now reads its counter atomically. The scheduler’s full capacity calculation also checks available physical memory and reserved pages. Reading the reserved-page count still takes the allocator lock. When monitoring needs the total, free, in-use and reserved counts together, it calls `get_page_state()` and reads those four counters under one lock. It reads available physical capacity separately.
 
 ```mermaid
 sequenceDiagram

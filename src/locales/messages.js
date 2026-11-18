@@ -158,7 +158,7 @@ export default {
     "allocator-snapshots": {
       title: "让总页数和空闲页数对得上",
       summary:
-        "监控先读总页数，再读空闲页数，分配器可能刚好在中间扩容。现在总页数、空闲页、使用中和预留页一起读取，调度器也可以单独查空闲页数。",
+        "监控先读总页数，再读空闲页数，分配器可能刚好在中间扩容。现在总页数、空闲页、使用中和预留页一起读取，单查空闲页数时不需要拿锁。",
       problem: "分配线程与观测线程并发访问页计数器。",
       change: "区分单字段无数据竞争与多字段一致性。",
       evidence: "T4 对比了无同步、互斥锁和原子计数三种实现。",
@@ -405,7 +405,7 @@ export default {
     "allocator-snapshots": {
       title: "Reading page counts that agree with each other",
       summary:
-        "The pool could resize between two reads. Monitoring now reads total, free, in-use and reserved pages under one lock, while the scheduler can still read a single counter cheaply.",
+        "The pool could resize between two reads. Monitoring now reads total, free, in-use and reserved pages under one lock, while the free-page getter can read its counter without taking that lock.",
       problem: "Allocation and observation access page counters concurrently.",
       change: "Separate data-race freedom from snapshot consistency.",
       evidence:

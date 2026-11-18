@@ -16,6 +16,8 @@ Hash-based routes work without server rewrites. The about page supports the brow
 
 The workflow audits dependencies and runs formatting, unit tests, the production build, and bilingual browser tests on pull requests and main. It deploys `dist/` only after a successful main build. Failed browser runs retain diagnostics for seven days. Local previews do not change the public website.
 
+The audit runs with `npm run audit:site`. It temporarily accepts [GHSA-fc5q-39xc-vjpf](https://github.com/advisories/GHSA-fc5q-39xc-vjpf) for the transitive build dependency picomatch 4.0.7. The production build checks that browser chunks contain no picomatch modules. When a fixed version ships, update the lockfile, remove the exception, and run the full audit and site checks.
+
 ## Deployment ownership
 
 | Repository | Published path | Content |
