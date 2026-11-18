@@ -1,6 +1,8 @@
-## The problem: individually readable values are not a coherent state
+## The pool resized halfway through a reading
 
-Allocation, release and resize update counters while monitoring reads them. Protecting writes with the allocator mutex did not protect unsynchronized plain-integer readers from C++ data races. Separately, even safe individual reads can combine total and free from different states.
+Monitoring asks for the total number of pages and then the number of free pages. If the pool grows between the calls, one figure describes the smaller pool and the other describes the larger one. Displaying them side by side can give a picture that never existed.
+
+There was also a problem with reading just one field. Writers held a mutex, but readers accessed ordinary C++ integers without taking that lock. A concurrent read and write could race.
 
 ```mermaid
 sequenceDiagram
@@ -12,9 +14,9 @@ A->>B: Read free
 B-->>A: Values may describe different states
 ```
 
-## The fix: separate two read contracts
+## Reading one counter or taking a snapshot
 
-Hot single-counter readers use relaxed atomics without waiting for the allocator mutex. Observers that need a coherent total/free/in-use/reserved tuple call get_page_state(), which reads the complete state inside one critical section. Neither mechanism replaces the other.
+The free-page getter now reads its counter atomically. The scheduler’s full capacity calculation also checks available physical memory and reserved pages. Reading the reserved-page count still takes the allocator lock. When monitoring needs the total, free, in-use and reserved counts together, it calls `get_page_state()` and reads those four counters under one lock. It reads available physical capacity separately.
 
 ```mermaid
 sequenceDiagram
@@ -37,18 +39,8 @@ PageState PageAllocator::get_page_state() const {
 }
 ```
 
-[Source at the merged revision](https://github.com/ovg-project/kvcached/blob/d40c4ce8aa761f809e4d6d2d57d30ce8a295000a/csrc/page_allocator.cpp#L443-L476)
+The threads changing the counts use the same mutex. The inner helper is called `unlocked` because its caller already holds the lock. [Allocator source](https://github.com/ovg-project/kvcached/blob/d40c4ce8aa761f809e4d6d2d57d30ce8a295000a/csrc/page_allocator.cpp#L443-L476)
 
-## Why not lock everything or make everything atomic?
+## What did locking cost?
 
-A mutex on every getter addresses data races but makes frequent readers wait for allocator writes. Atomic fields alone do not turn several loads into a transaction. Relaxed ordering protects counter accesses; it is not a publication protocol for GPU mapping completion.
-
-## Validation and limits
-
-The PR reports three-run medians on T4 with Qwen2.5-3B, C64/N256 and I512/O128: 2501.87 total tok/s for the unsynchronized baseline, 2458.83 for mutex-protected hot getters, and 2504.00 for atomic getters plus a locked snapshot. These are workload-specific observations, not universal speedups. Validation also included 1000 concurrent shrink/expand cycles, 10 focused tests and 121 CPU tests.
-
-## Pitfalls
-
-_unlocked means the caller already holds the required lock; it does not mean the helper just released it. Internal helpers avoid reacquiring a non-recursive mutex. A Python manager lock is not the C++ allocator mutex. A difference between two atomic loads is still not a coherent snapshot during resize.
-
-[PR #443](https://github.com/ovg-project/kvcached/pull/443)
+The PR ran Qwen2.5-3B on a T4. Across three rounds, median total throughput was 2501.87 tok/s for the original code, 2458.83 with a mutex on every getter, and 2504.00 with atomic reads and a locked snapshot. The last version stayed close to the original on this workload. A separate test checked the snapshots while the pool went through 1,000 shrink-and-expand cycles. [Test results](https://github.com/ovg-project/kvcached/pull/443)

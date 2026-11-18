@@ -19,7 +19,7 @@ jobs:
           node-version: "22"
           cache: npm
       - run: npm ci
-      - run: npm audit
+      - run: npm run audit:site
       - run: npx playwright install --with-deps chromium
       - run: npm run check
       - name: Check personal-site artifact boundaries

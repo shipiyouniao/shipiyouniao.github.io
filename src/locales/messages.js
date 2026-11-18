@@ -1,26 +1,27 @@
 export default {
   zh: {
     "incremental-eviction": {
-      title: "释放一个块，为什么要扫描整个缓存池？",
-      summary: "用增量页索引缩短缓存淘汰热路径，保留原有容量上限与淘汰策略。",
+      title: "释放一个缓存块，为什么要扫一遍整个池子？",
+      summary:
+        "缓存池里留着 1000 个块时，每释放一个块，旧代码就要把候选块重新分组、排序。改成只更新有变化的页后，这一步从约 260 微秒降到了约 20 微秒。",
       problem: "每次缓存裁剪都重新分组和排序全部可淘汰块。",
       change: "仅刷新变化的页，按代价与近期使用顺序选择候选。",
       evidence:
         "T4 单块裁剪微基准从约 260 微秒降至约 20 微秒，不等于推理吞吐提升。",
     },
     "async-unmap": {
-      title: "请求结束了，GPU 为什么还不能释放这页？",
+      title: "等最后一批 GPU 任务跑完，再回收缓存页",
       summary:
-        "让物理 unmap 排在已入队的 Worker 工作之后，消除逻辑释放与异步执行的错位。",
+        "一个请求已经返回，排在后面的 GPU 任务却还可能读取它用过的页。现在等这些任务跑完，再把页交回分配器。",
       problem: "后续批次仍持有 block table，物理页却已被撤销映射。",
       change: "先记录退休页，再通过 Worker 队列屏障确认安全释放。",
       evidence:
         "真实 CUDA 映射故障注入与单 T4 服务 A/B 验证，明确区分多卡与退出阶段边界。",
     },
     "hybrid-retry": {
-      title: "可以重试，不代表状态已经回到了重试之前",
+      title: "显存分配失败后，撤回这一次的改动",
       summary:
-        "修复混合缓存分配失败后的残留状态，以及异步 decode 重复发布旧 Mamba 边界的问题。",
+        "几个缓存组一起申请显存，前一组已经改了记录，后一组才失败。重试前得撤回这一次的改动，还要留住请求之前算好的状态。",
       problem: "后一个缓存组分配失败时，前一个组可能已移动哈希并排入复制任务。",
       change: "只撤销本轮未发布的分配，并阻止运行态覆盖旧检查点。",
       evidence:
@@ -29,36 +30,17 @@ export default {
     name: "石皮幼鸟",
     home: "首页",
     notes: "PR 手记",
-    projects: "作品与开源",
+    projects: "项目",
     about: "关于我",
     skip: "跳到正文",
     nav: "主导航",
     mobileNav: "移动导航",
     toggleNav: "切换导航",
     language: "语言",
-    footer: "认真写代码，也留一点时间给好玩的事。",
-    eyebrow: "全栈工程师 · 开源贡献者",
-    hero1: "在系统深处解决问题，",
-    hero2: "在代码之外创造一点乐趣。",
-    role: "全栈工程师 · KVCached 维护者之一",
-    focus: "目前专注于 AI 基础设施、推理系统与 GPU 显存管理。",
-    seeWork: "看看我在做什么",
     location: "中国 · 深圳",
-    curious: "保持好奇，持续构建。",
-    mountainAlt: "阳光下的山脊与云层",
-    photoCredit: "风景摄影 · Unsplash",
-    introEyebrow: "关于我",
-    introTitle: "工程，也不止工程。",
-    meet: "认识一下",
-    introLead: "从 Vue 界面到 GPU 显存，喜欢把事情从头到尾做完整。",
-    introBody:
-      "工作中关注推理引擎适配、内存管理与可观测性，也参与 vLLM 和 SGLang 的开源协作。习惯用源码、复现和实机数据寻找答案。",
-    introFun:
-      "偏爱 C#，写前后端，也折腾 Unity。工作之外是 Bilibili UP 主，玩音游，也做游戏攻略。",
-    notesEyebrow: "开源实践",
-    notesTitle: "改了什么，为什么改。",
+    mountainAlt: "森林环绕的山谷，远处是云下的雪山",
     allNotes: "全部 PR 手记",
-    notesCount: "{count} 项公开贡献",
+    notesCount: "{count} 篇手记",
     all: "全部",
     filter: "按项目筛选",
     search: "搜索 PR",
@@ -70,31 +52,26 @@ export default {
     change: "修改",
     evidence: "验证与边界",
     source: "查看原始 PR 与讨论",
-    workEyebrow: "精选作品",
-    workTitle: "认真做的东西",
-    workSubtitle: "开源协作与个人作品",
-    gameLabel: "独立作品 / 浏览器游戏",
+    gameLabel: "浏览器游戏",
     gameText:
-      "扫雷，也是一场小小的冒险。在探索、谜题与故事之间，走出自己的路线。",
+      "我把扫雷做成了一款冒险游戏。你可以一边根据数字推断地雷的位置，一边解谜、探索地图，推进剧情。",
     gameAlt: "Minefarer 游戏中的旅人与灯火营地",
     gameDesign: "游戏设计",
-    play: "开始冒险",
+    play: "在浏览器中游玩",
     code: "源代码",
-    openSource: "开源",
+    openSource: "开源项目",
     kvText:
-      "参与维护弹性 KV Cache 基础设施，关注显存管理、推理引擎集成与运行正确性。",
+      "KVCached 让推理服务按需申请和归还 GPU 显存。我主要维护它与 vLLM、SGLang 的集成，也处理缓存分配和回收中的问题。",
     repo: "项目仓库",
     nnrpText: "跨语言运行时协议实践。Rust、Python 与 C#。",
     unityText: "面向 Unity 的轻量依赖注入工具。",
-    behind: "代码之外的我",
-    hello: "你好，我是石皮幼鸟。",
     print: "打印或保存为 PDF",
     avatar: "石皮幼鸟的 GitHub 头像",
-    fullstack: "全栈工程师，C# 爱好者。",
+    fullstack: "全栈工程师",
     company: "深信服 · 中国深圳",
     contributor: "KVCached 维护者之一，参与 vLLM 与 SGLang 开源协作。",
     aboutBody:
-      "我喜欢从界面到系统底层追踪问题。最近的工作主要围绕大模型推理、GPU 显存管理、可观测性和版本适配。工作之外，写一些工具，做游戏，也在 Bilibili 分享游戏视频。",
+      "我最早做 Web 和监控系统，现在主要做大模型推理。平时喜欢写 C#，也用 Unity 和浏览器做游戏。",
     stack: "技术栈",
     frontend: "前端",
     backend: "后端与运行时",
@@ -106,19 +83,15 @@ export default {
     embedded: "嵌入式开发经历",
     native: "原生应用开发经历",
     browserGames: "浏览器游戏",
-    contactTitle: "聊聊技术，或者一起做点什么。",
+    contactTitle: "邮箱",
     copyFallback: "请通过邮件地址联系。",
     copied: "邮箱已复制",
     copy: "复制邮箱",
     missing: "这一页还没有写下。",
     backHome: "回到首页",
-    connect: "保持联系",
-    closing: "想法值得交流，代码值得打磨。",
-    sayHi: "打个招呼",
-    biliEyebrow: "游戏与视频",
-    biliTitle: "写代码，也打音游。",
+    biliTitle: "视频、课程与攻略",
     biliBody:
-      "我是 Bilibili 的石皮幼鸟。分享 IIDX 游玩记录，也制作技术课程与游戏攻略。代表作包括《面向 Java 程序员的 C# 基础课程》和逆转裁判系列攻略。",
+      "我在 B 站用「石皮幼鸟」这个名字发视频，内容从 IIDX 游玩记录到给 Java 程序员录的 C# 课都有。",
     biliHistory:
       "曾在猫霸汉化组担任攻略作者，编写《逆转裁判 6》《大逆转裁判 2》的中文攻略，均为全网首发。",
     biliCourse: "技术课程",
@@ -134,16 +107,18 @@ export default {
     expandDiagram: "放大时序图",
     closeDiagram: "关闭时序图",
     loadingDiagram: "正在绘制时序图…",
-    biliVisit: "去 Bilibili 找我",
+    biliVisit: "Bilibili 主页",
     biliRhythm: "音游记录",
     biliGuide: "游戏攻略",
     biliVideo1: "IIDX · 全皿皆传（EMERALDAS组）",
     biliVideo2: "《魔女之泉》多结局攻略",
     biliWatch: "观看视频",
-    description: "石皮幼鸟的个人主页：全栈开发、开源贡献与游戏视频。",
+    description:
+      "石皮幼鸟的个人网站，收录 KVCached 和 vLLM 的 PR 手记、个人项目与游戏攻略。",
     "prefix-cache": {
-      title: "前缀缓存：一个哈希，多个物理块",
-      summary: "让相同前缀的多个 block 都被正确登记，并按 block ID 独立淘汰。",
+      title: "两个缓存块存了同一段前缀，只登记了一个",
+      summary:
+        "两个块的内容相同，编号却不同。旧代码看到相同的缓存键就跳过登记，第二个块因此缺少哈希，后续请求可能触发断言。",
       problem:
         "旧索引只为每个缓存 key 保存一个 block。不同请求产生相同前缀时，后登记的物理块可能被当成重复调用跳过，遗漏哈希标记与反向索引。",
       change:
@@ -152,8 +127,9 @@ export default {
         "PR 记录了 30 项前缀缓存单测通过，以及双实例高并发回放 1440/1440 请求完成。这是该 PR 的验证记录，不是所有模型与版本的通用性能结论。",
     },
     observability: {
-      title: "为 KV Cache 提供只读观测接口",
-      summary: "把分配器状态整理为结构化快照，让采集端不用依赖内部实现。",
+      title: "KV 缓存究竟占了多少显存？",
+      summary:
+        "一个缓存池可以留出很大的地址空间，却只用到其中几页显存。新的查询接口把这两项分开报告，也能查到分配器登记了多少块，其中包括留作备用的块。",
       problem:
         "外部监控需要知道 KV 池的已用、预留、虚拟和已映射容量；直接读取内部字段容易与引擎适配实现耦合。",
       change:
@@ -162,8 +138,9 @@ export default {
         "公开 PR 包含 CPU 单测及 RTX 4090 上真实 CUDA VMM 池的分配、快照、释放验证。接口不引入调度策略或容量准入。",
     },
     "worker-rpc": {
-      title: "在下一次出队前释放 Worker RPC 参数",
-      summary: "用独立栈帧缩短对象生命周期，避免相邻 RPC 的反序列化负载重叠。",
+      title: "上一条请求为什么还占着内存？",
+      summary:
+        "上一条请求已经处理完，Python 循环却还引用着它的参数和结果。把一次调用放进单独的函数，两批数据就不必同时留在内存里。",
       problem:
         "Worker 循环在取下一个请求时仍持有上一次的参数和输出引用。含 CPU Tensor 的 RPC 会出现两批反序列化对象同时存活，抬高瞬时内存峰值。",
       change:
@@ -179,23 +156,25 @@ export default {
     statsStale: "刷新失败，当前保留上次获取的数据。",
     statsUpdated: "GitHub · 更新于 {time}",
     "allocator-snapshots": {
-      title: "计数器并发安全与一致快照",
-      summary: "高频单字段读取使用 relaxed atomic，多字段观测使用短锁快照。",
+      title: "让总页数和空闲页数对得上",
+      summary:
+        "监控先读总页数，再读空闲页数，分配器可能刚好在中间扩容。现在总页数、空闲页、使用中和预留页一起读取，单查空闲页数时不需要拿锁。",
       problem: "分配线程与观测线程并发访问页计数器。",
       change: "区分单字段无数据竞争与多字段一致性。",
       evidence: "T4 对比了无同步、互斥锁和原子计数三种实现。",
     },
     "shared-gpu-startup": {
-      title: "同卡多实例：启动预算不再依赖整卡显存波动",
-      summary: "分离逻辑 KV 容量与物理显存准入，避免将其他进程的变化计入自身。",
+      title: "同卡的另一个进程释放显存，vLLM 却启动失败了",
+      summary:
+        "vLLM 启动时要估算自己用了多少显存。同卡另一个实例恰好释放显存，整张卡的读数就会误导它，甚至触发启动断言。",
       problem: "整卡空闲显存变化不是本实例的显存开销。",
       change: "使用稳定预算与进程内成本计算逻辑容量。",
       evidence: "vLLM 与 SGLang 在 T4 上完成启动和请求验证。",
     },
     "inference-mode": {
-      title: "一个遗漏的装饰器，怎样放大显存峰值",
+      title: "追查启动时多出来的 11 GiB 显存",
       summary:
-        "恢复 profiling 的 inference-mode 契约，也记录一次补丁回归的教训。",
+        "同一张图、同一个模型，差别出在视觉编码器上。替换启动方法时漏了一行，PyTorch 在试跑时也留下了反向传播要用的数据。",
       problem: "替换方法时遗漏推理模式，保留了不必要的反向图。",
       change: "恢复外层 inference_mode 并增加执行上下文回归测试。",
       evidence: "同输入 A/B 将问题定位到多模态 encoder profiling。",
@@ -207,24 +186,23 @@ export default {
       "重点处理同卡多实例运行中的物理页竞争、多进程映射一致性、异步释放时序，以及前缀缓存块的登记与淘汰问题。",
       "结合真实 GPU 压测和故障注入，检查修复是否兼顾正确性、吞吐和实例间公平性。",
     ],
-    openEngineTitle: "沿着框架执行路径定位问题",
+    openEngineTitle: "vLLM 和 SGLang 的引擎适配",
     openEngineBody: [
-      "参与 vLLM 与 SGLang 的开源协作，从调度器、Worker 到缓存分配器追踪问题。",
-      "贡献涉及 Worker RPC 参数生命周期、缓存接口和版本兼容等方向，减少不必要的内存占用，并处理框架升级带来的适配差异。",
-      "能够在上游解决的共性问题，尽量在对应项目中修复，减少下游长期维护的补丁。",
+      "在 vLLM 里，我处理过 worker 在两次调用之间多占内存的问题。在 KVCached 这边，我会跟进 vLLM 和 SGLang 的版本变化，调整缓存接口。",
+      "问题出在引擎本身时，我会把修复提交给上游，后续升级也就少维护一份补丁。",
     ],
     openCollaboration: "可观测性与协作",
-    openObservabilityTitle: "让资源状态可解释，让改动可验证",
+    openObservabilityTitle: "KV 缓存监控和代码评审",
     openObservabilityBody: [
-      "参与推动 KVCached 可观测性路线，建设只读快照与池状态接口，明确逻辑容量、物理映射和保留页的统计口径。",
-      "也参与相关贡献的评审与集成，补充复现条件、源码分析和实机验证，区分已经验证的结果与尚待覆盖的场景。",
+      "我给 KVCached 加了只读查询接口，监控可以分别看到池子预留了多少地址空间、实际映射了多少显存、还有多少页可用。",
+      "评审相关改动时，我会看复现问题的最小用例，核对计数，再和 GPU 上的实际结果对照。",
     ],
     joined: "深信服 · 2025 年 6 月 25 日入职",
     current: "2026.03 至今",
     sccTitle: "深信服分布式云（SCC）· 前沿技术团队",
     sccBody: [
-      "负责智算产品 AI Infra 方向的技术预研与版本落地，围绕大模型推理基础设施推动方案从验证进入产品。",
-      "主要攻坚成果包括模型权重共享、KV Cache 池化等显存复用能力，以及弹性调度策略，推动这些能力在产品中落地。",
+      "在智算产品团队做大模型推理基础设施，负责技术预研和产品实现。",
+      "主要做模型权重共享、KV Cache 池化和弹性调度，让多个推理实例可以共用 GPU 显存。",
     ],
     previous: "2025.06–2026.02",
     foundations: "理论基础",
@@ -233,9 +211,8 @@ export default {
     foundationGraphics: "计算机图形学",
     learningTitle: "从 AI 应用走向推理基础设施",
     learningBody: [
-      "2026 年 3 月以前，我的 AI 经历主要是使用 AI 工具和开发 Agent，还没有接触神经网络底层。转向智算后，我花了一个月重新拾起大一学过、此后几年没有系统使用的线性代数、概率论与数理统计，集中补齐 AI Infra 工作所需的机器学习和深度学习知识。",
-      "学习和工程实践是一起推进的：从阅读推理引擎源码、追踪显存与执行路径，到构造复现、修复问题并提交经过验证的 PR，逐步参与 KVCached 等推理基础设施的质量改进。",
-      "目前正在进一步学习模型训练，希望把对推理系统的理解延伸到训练过程。我也有计算机图形学理论基础，关注数学、底层执行与实际工程之间的联系。",
+      "2026 年 3 月以前，我主要用 AI 工具、写 Agent。转做推理基础设施后，我花了一个月重新学起大一的线性代数、概率论和数理统计，也补了机器学习和深度学习。",
+      "学到的东西很快就在工作里用上了。我开始读推理引擎的源码，跟着一次请求看显存怎么分配，再把能复现的问题修掉。现在也在学模型训练。",
     ],
     scpTitle: "SCP 私有云平台 · 基础架构团队",
     scpBody: [
@@ -244,7 +221,7 @@ export default {
       "同时定制修改 VictoriaMetrics 源码，加入基于 Ed25519 的握手等安全功能。",
     ],
     dslBody:
-      "设计并实现 Python 下的 PromQL / MetricsQL 查询构建 DSL，服务内部监控开发；工具尚未开源。",
+      "为内部监控开发写了一个 Python DSL，用它生成 PromQL 和 MetricsQL 查询。工具尚未开源。",
     education: "教育与在校经历",
     university: "成都信息工程大学",
     degree: "软件工程学院 · 软件工程专业 · 本科",
@@ -256,12 +233,16 @@ export default {
       "本科期间进入研究生实验室，在教授指导下带领研究生完成多个项目。",
       "其中，负责中国科学院国家授时中心“高精度地基授时系统”操作与监控平台的前后端开发。该系统属于国家“十三五”重大科技基础设施项目。",
     ],
+    intro:
+      "我是全栈工程师，在深信服做大模型推理。作为 KVCached 的维护者之一，我主要解决多个模型共用一张 GPU 时的显存分配和回收问题。",
+    interests: "工作之外，我喜欢写 C#、做扫雷游戏，也在 B 站发音游录像和攻略。",
+    allProjects: "全部项目",
   },
   en: {
     "incremental-eviction": {
       title: "Why scan the whole cache to free one block?",
       summary:
-        "An incremental page index shortens eviction work without changing the cache cap or victim policy.",
+        "With 1,000 blocks cached, freeing one block meant sorting candidates across the pool. Updating only the pages that changed cut a single trim from about 260 to 20 microseconds.",
       problem: "Each trim regrouped and sorted the entire evictable pool.",
       change:
         "Refresh changed pages and select candidates by cost and recency.",
@@ -269,9 +250,9 @@ export default {
         "T4 single-block trim microbenchmarks fell from about 260 to 20 microseconds, not a serving-throughput claim.",
     },
     "async-unmap": {
-      title: "The request finished. Why is this GPU page still in use?",
+      title: "Waiting for the last GPU batch before freeing its memory",
       summary:
-        "Order physical unmap after queued worker work instead of treating logical release as GPU completion.",
+        "A batch already in the worker queue could still read the page. The fix keeps its memory mapped until the workers finish that batch.",
       problem:
         "A queued batch can retain a block table after its backing page is unmapped.",
       change:
@@ -280,10 +261,9 @@ export default {
         "Real CUDA fault probes and single-T4 serving A/B, with explicit multi-rank and shutdown limitations.",
     },
     "hybrid-retry": {
-      title:
-        "A retry is only safe if the previous attempt left no broken state",
+      title: "Undoing a half-finished cache allocation",
       summary:
-        "Recover partial hybrid-cache allocations and prevent stale Mamba checkpoint publication during async decode.",
+        "One cache group had already moved a block’s lookup key and queued a copy when the next group ran out of memory. Retrying safely meant undoing just that attempt.",
       problem:
         "An earlier group may move hashes and queue copies before a later group fails allocation.",
       change:
@@ -301,31 +281,10 @@ export default {
     mobileNav: "Mobile navigation",
     toggleNav: "Toggle navigation",
     language: "Language",
-    footer: "Building useful things, and making time for fun.",
-    eyebrow: "FULL-STACK ENGINEER · OPEN-SOURCE CONTRIBUTOR",
-    hero1: "Solving problems deep in systems.",
-    hero2: "Making room for fun beyond code.",
-    role: "Full-stack engineer · One of the KVCached maintainers",
-    focus:
-      "Currently working on AI infrastructure, inference systems, and GPU memory management.",
-    seeWork: "Explore my work",
     location: "Shenzhen, China",
-    curious: "Stay curious. Keep building.",
-    mountainAlt: "Sunlit mountain ridges and clouds",
-    photoCredit: "Landscape · Unsplash",
-    introEyebrow: "A LITTLE ABOUT ME",
-    introTitle: "Engineering, and a little more.",
-    meet: "Get to know me",
-    introLead:
-      "From Vue interfaces to GPU memory, I enjoy building things end to end.",
-    introBody:
-      "I work on inference-engine integration, memory management, and observability, and contribute to vLLM and SGLang. I look for answers in source code, reproducers, and hardware measurements.",
-    introFun:
-      "I particularly enjoy C#, build frontend and backend applications, and experiment with Unity. Outside work, I make Bilibili videos about rhythm games and game walkthroughs.",
-    notesEyebrow: "OPEN-SOURCE NOTES",
-    notesTitle: "Changes with a reason.",
+    mountainAlt: "A forested valley with snow-covered peaks beneath the clouds",
     allNotes: "All PR notes",
-    notesCount: "{count} public contributions",
+    notesCount: "{count} notes",
     all: "All",
     filter: "Filter by project",
     search: "Search PR notes",
@@ -337,33 +296,28 @@ export default {
     change: "Change",
     evidence: "Evidence and scope",
     source: "Read the original PR and discussion",
-    workEyebrow: "SELECTED WORK",
-    workTitle: "Things I work on",
-    workSubtitle: "Open source & personal projects",
-    gameLabel: "PERSONAL PROJECT / BROWSER GAME",
+    gameLabel: "Browser game",
     gameText:
-      "A small adventure built around Minesweeper. Find your way through exploration, puzzles, and a story campaign.",
+      "I built a browser adventure around Minesweeper. Use the numbers to work out where the mines are as you explore the map and play through the story.",
     gameAlt: "Travelers at the lantern-lit camp in Minefarer",
     gameDesign: "Game design",
-    play: "Play Minefarer",
+    play: "Play in browser",
     code: "Source code",
-    openSource: "OPEN SOURCE",
+    openSource: "Open source",
     kvText:
-      "Helping maintain elastic KV cache infrastructure, focusing on memory management, engine integration, and runtime correctness.",
+      "KVCached lets inference servers request GPU memory as they need it and return it when they finish. I work on allocation, reclamation, and integration with vLLM and SGLang.",
     repo: "Repository",
     nnrpText:
       "A cross-language runtime protocol project in Rust, Python, and C#.",
     unityText: "Lightweight dependency injection for Unity.",
-    behind: "BEHIND THE CODE",
-    hello: "Hi, I'm shipiyouniao.",
     print: "Print or save as PDF",
     avatar: "shipiyouniao's GitHub avatar",
-    fullstack: "Full-stack engineer. C# enthusiast.",
+    fullstack: "Full-stack engineer",
     company: "Sangfor Technologies · Shenzhen, China",
     contributor:
       "One of the KVCached maintainers; a contributor to vLLM and SGLang.",
     aboutBody:
-      "I enjoy tracing problems from interfaces down to systems. My recent work covers LLM inference, GPU memory, observability, and compatibility. Outside work, I build tools and games, and share gaming videos on Bilibili.",
+      "I started out building web applications and monitoring systems. These days I work on LLM inference. I also enjoy writing C# and making games in Unity and for the browser.",
     stack: "Toolbox",
     frontend: "Frontend",
     backend: "Backend & runtimes",
@@ -375,19 +329,15 @@ export default {
     embedded: "Embedded development experience",
     native: "Native app development experience",
     browserGames: "Browser games",
-    contactTitle: "Talk technology, or build something together.",
+    contactTitle: "Email",
     copyFallback: "Please use the email link to get in touch.",
     copied: "Email copied",
     copy: "Copy email",
     missing: "This page hasn't been written yet.",
     backHome: "Back home",
-    connect: "LET'S CONNECT",
-    closing: "Ideas to exchange. Code to improve.",
-    sayHi: "Say hello",
-    biliEyebrow: "GAMES & VIDEOS",
-    biliTitle: "Code, rhythm games, and more.",
+    biliTitle: "Videos, courses and walkthroughs",
     biliBody:
-      "I'm 石皮幼鸟 on Bilibili. I share IIDX play sessions, programming courses and game guides. Featured work includes a C# fundamentals course for Java programmers and Ace Attorney walkthroughs.",
+      "I post on Bilibili as 石皮幼鸟. My videos include IIDX play sessions and a C# course I recorded for Java programmers.",
     biliHistory:
       "Previously a walkthrough author with the 猫霸汉化组 translation team, I published the first Chinese walkthroughs online for Ace Attorney 6 and The Great Ace Attorney 2.",
     biliCourse: "Programming",
@@ -403,18 +353,18 @@ export default {
     expandDiagram: "Expand diagram",
     closeDiagram: "Close diagram",
     loadingDiagram: "Rendering diagram…",
-    biliVisit: "Visit my Bilibili",
+    biliVisit: "Bilibili channel",
     biliRhythm: "Rhythm games",
     biliGuide: "Walkthroughs",
     biliVideo1: "IIDX · All-Scratch Kaiden (EMERALDAS course)",
     biliVideo2: "WitchSpring · Multiple-ending walkthrough",
     biliWatch: "Watch video",
     description:
-      "shipiyouniao: full-stack engineering, open-source contributions, and gaming videos.",
+      "Engineering notes on KVCached and vLLM, browser games, and walkthroughs by shipiyouniao.",
     "prefix-cache": {
-      title: "Prefix caching: one hash, multiple physical blocks",
+      title: "The prefix cache recorded only one of two copies",
       summary:
-        "Track every block sharing a prefix, and evict each by its own block ID.",
+        "Two blocks can hold the same prefix. The index skipped the second block when it recognized the key, leaving that block without the hash vLLM expected.",
       problem:
         "The old index kept one block per cache key. A distinct block with the same prefix could be mistaken for an idempotent repeat, leaving its hash stamp and reverse-index entry unset.",
       change:
@@ -423,9 +373,9 @@ export default {
         "The PR reports 30 passing prefix-cache tests and 1,440/1,440 completed requests in a two-instance high-concurrency replay. This is scoped validation, not a performance claim for every model and version.",
     },
     observability: {
-      title: "Read-only observability for KV cache pools",
+      title: "How much GPU memory is the KV cache actually using?",
       summary:
-        "Expose structured allocator snapshots without coupling collectors to private internals.",
+        "A pool can reserve a large address range while backing only a few pages with GPU memory. A new query reports both figures alongside the allocator’s block count, including blocks held in reserve.",
       problem:
         "Monitoring needs allocated, reserved, virtual, and mapped capacity. Reading private fields couples consumers to allocator and engine-patch implementation details.",
       change:
@@ -434,9 +384,9 @@ export default {
         "The public PR includes CPU tests and allocation/snapshot/free checks on a real CUDA VMM pool on an RTX 4090. The interface adds no scheduling or admission policy.",
     },
     "worker-rpc": {
-      title: "Release worker RPC payloads before the next dequeue",
+      title: "Why was the previous request still in memory?",
       summary:
-        "Shorten object lifetimes with a separate stack frame, avoiding overlapping deserialized payloads.",
+        "While the worker unpacked its next message, local variables still held the previous payload. Giving each call its own function lets those references go first.",
       problem:
         "The worker loop retained arguments and output while dequeuing the next request. RPCs with CPU tensors could keep two deserialized payloads alive at once, increasing transient memory use.",
       change:
@@ -453,27 +403,27 @@ export default {
     statsStale: "Refresh failed. Showing the last retrieved data.",
     statsUpdated: "GitHub · Updated at {time}",
     "allocator-snapshots": {
-      title: "Race-free counters and coherent snapshots",
+      title: "Reading page counts that agree with each other",
       summary:
-        "Relaxed atomic reads for hot counters, a short lock for coherent multi-field observations.",
+        "The pool could resize between two reads. Monitoring now reads total, free, in-use and reserved pages under one lock, while the free-page getter can read its counter without taking that lock.",
       problem: "Allocation and observation access page counters concurrently.",
       change: "Separate data-race freedom from snapshot consistency.",
       evidence:
         "T4 measurements compare unsynchronized, mutex and atomic variants.",
     },
     "shared-gpu-startup": {
-      title: "Shared-GPU startup without device-wide budget contamination",
+      title: "A neighbor freed GPU memory and vLLM failed to start",
       summary:
-        "Separate logical KV sizing from physical admission and peer-process memory changes.",
+        "vLLM estimated its own memory use from two device-wide readings. A second process could free memory between them and trip the first process’s startup check.",
       problem: "Device-wide memory changes are not process-local costs.",
       change:
         "Use a stable budget and process-local costs for logical capacity.",
       evidence: "T4 startup and request validation with vLLM and SGLang.",
     },
     "inference-mode": {
-      title: "How a missing decorator inflated profiling memory",
+      title: "Tracing an extra 11 GiB of memory at startup",
       summary:
-        "Restore inference mode and document a regression introduced by a patch.",
+        "The model and image were identical. A replacement worker method lost its inference-mode decorator, so PyTorch kept tensors for a backward pass during the vision encoder’s test run.",
       problem: "Replacing a method dropped its inference-mode contract.",
       change: "Restore the decorator and test the execution context.",
       evidence: "Identical-input A/B isolated multimodal encoder profiling.",
@@ -485,25 +435,23 @@ export default {
       "My work focuses on physical-page contention between instances sharing a GPU, cross-process mapping consistency, asynchronous release ordering, and prefix-cache block registration and eviction.",
       "I use real-GPU workloads and fault injection to assess correctness, throughput and fairness together.",
     ],
-    openEngineTitle: "Tracing problems through inference engines",
+    openEngineTitle: "Integrating with vLLM and SGLang",
     openEngineBody: [
-      "I contribute to vLLM and SGLang, tracing issues through schedulers, workers and cache allocators.",
-      "Contributions cover worker RPC payload lifetimes, cache interfaces and version compatibility, addressing unnecessary memory retention and integration changes across releases.",
-      "Where a problem belongs upstream, I work toward fixing it there to reduce long-lived downstream patches.",
+      "In vLLM I fixed a worker that held on to memory between calls. In KVCached I adapt the cache integration as vLLM and SGLang change across releases.",
+      "When the issue belongs in the engine itself, I send the fix upstream so we have one fewer patch to carry.",
     ],
     openCollaboration: "Observability & collaboration",
-    openObservabilityTitle:
-      "Making resource state understandable and changes verifiable",
+    openObservabilityTitle: "KV cache monitoring and code review",
     openObservabilityBody: [
-      "I help advance KVCached's observability roadmap through read-only snapshots and pool-state interfaces, with explicit definitions for logical capacity, physical mappings and reserved pages.",
-      "I also review and integrate related contributions, documenting reproduction conditions, source-level analysis and hardware validation while distinguishing verified results from scenarios that still need coverage.",
+      "I added read-only queries to KVCached so monitoring can show reserved address space, mapped GPU memory, and available pages separately.",
+      "When reviewing changes in this area, I look at a small reproducer, check the counters, and compare them with measurements on the GPU.",
     ],
     joined: "Sangfor Technologies · Joined June 25, 2025",
     current: "Mar 2026–present",
     sccTitle: "Sangfor Cloud-service Center (SCC) · Emerging Technology Team",
     sccBody: [
-      "Responsible for AI infrastructure research and product delivery for intelligent computing, taking LLM inference infrastructure from validation into releases.",
-      "Key work includes model weight sharing, KV cache pooling and other GPU memory reuse capabilities, alongside elastic scheduling strategies, bringing these capabilities into the product.",
+      "I research and implement LLM inference features for Sangfor’s AI computing products.",
+      "My work covers model weight sharing, KV cache pooling, and elastic scheduling for inference instances that share GPU memory.",
     ],
     previous: "Jun 2025–Feb 2026",
     foundations: "Foundations",
@@ -512,9 +460,8 @@ export default {
     foundationGraphics: "Computer graphics",
     learningTitle: "From AI applications to inference infrastructure",
     learningBody: [
-      "Before March 2026, my AI experience was primarily using AI tools and developing agents, rather than working with neural-network internals. Moving into AI infrastructure, I spent a month revisiting linear algebra, probability and mathematical statistics that I had studied in my first university year but had not used systematically for years, alongside the machine learning and deep learning knowledge needed for infrastructure work.",
-      "Learning and engineering progressed together: reading inference-engine source, tracing memory and execution paths, building reproducers, and contributing verified fixes to improve the quality of inference infrastructure such as KVCached.",
-      "I am now studying model training to extend that understanding beyond inference. I also have a theoretical foundation in computer graphics and enjoy connecting mathematics with low-level execution and practical engineering.",
+      "Before March 2026, most of my AI experience came from using AI tools and building agents. When I moved into inference infrastructure, I spent a month revisiting first-year linear algebra, probability, and statistics, alongside machine learning and deep learning.",
+      "At work I started following individual requests through the engine to see how it allocated memory, then writing fixes for issues I could reproduce. I’m now studying model training as well.",
     ],
     scpTitle: "SCP (Sangfor Cloud Platform) · Infrastructure Team",
     scpBody: [
@@ -523,7 +470,7 @@ export default {
       "Also customized the VictoriaMetrics source code to add security features, including an Ed25519-based handshake.",
     ],
     dslBody:
-      "Designed and implemented a Python DSL for building PromQL / MetricsQL queries for internal monitoring development. The tool is not open source.",
+      "I wrote an internal Python DSL for building PromQL and MetricsQL queries for monitoring.",
     education: "Education & campus experience",
     university: "Chengdu University of Information Technology",
     degree:
@@ -536,5 +483,10 @@ export default {
       "As an undergraduate, worked in a graduate research lab under a professor's guidance and led graduate students on multiple projects.",
       "Developed the frontend and backend of the operations and monitoring platform for the High Precision Ground-based Time Service System at the National Time Service Center, Chinese Academy of Sciences. The system is a major national science and technology infrastructure project under China's 13th Five-Year Plan.",
     ],
+    intro:
+      "I’m a full-stack engineer at Sangfor working on LLM inference. I help maintain KVCached, where I work on how models share GPU memory.",
+    interests:
+      "Outside work, I write C#, make games, and share rhythm game recordings and walkthroughs on Bilibili.",
+    allProjects: "All projects",
   },
 };

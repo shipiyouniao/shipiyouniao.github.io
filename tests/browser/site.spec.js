@@ -165,12 +165,43 @@ for (const language of ["zh-CN", "en-US"]) {
   });
 }
 
+test("topic search and printable author name in both languages", async ({
+  page,
+}) => {
+  for (const language of ["en", "zh"]) {
+    await page.goto("/#/notes");
+    await selectLanguage(page, language);
+    for (const [term, slug] of [
+      ["RPC", "worker-rpc"],
+      ["Mamba", "hybrid-retry"],
+      ["observability", "observability"],
+    ]) {
+      await page.getByRole("searchbox").fill(term);
+      await expect(page.locator(".note-card")).toHaveAttribute(
+        "href",
+        "#/notes/" + slug,
+      );
+    }
+    await page.goto("/#/about");
+    await page.emulateMedia({ media: "print" });
+    const heading = page.getByRole("heading", {
+      level: 1,
+      name: language === "zh" ? "石皮幼鸟" : "shipiyouniao",
+      exact: true,
+    });
+    await expect(heading).toBeVisible();
+    await page.emulateMedia({ media: "screen" });
+  }
+});
+
 test("manual language persists and updates article title", async ({ page }) => {
   await page.goto("/#/notes/worker-rpc");
   await selectLanguage(page, "en");
-  await expect(page).toHaveTitle(/Release worker RPC/);
+  await expect(page).toHaveTitle(
+    /Why was the previous request still in memory/,
+  );
   await selectLanguage(page, "zh");
-  await expect(page).toHaveTitle(/在下一次出队/);
+  await expect(page).toHaveTitle(/上一条请求为什么还占着内存/);
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
 });

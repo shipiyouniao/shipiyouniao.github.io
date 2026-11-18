@@ -1,8 +1,8 @@
-## EOS 返回时，后面可能还排着一批工作
+## 最后一批返回了，下一批已经在队列里
 
-异步调度把 CPU 调度和 GPU 执行重叠起来。第 N 批返回请求结束时，第 N+1 批可能已经进入 Worker 队列，里面仍带着之前生成的 block table。此时释放请求的逻辑块，不代表可以立刻撤销底层物理页映射。
+异步调度时，CPU 可以在 GPU 跑完第 N 批之前，就把第 N+1 批交给 worker。假如第 N 批返回了结束标记，引擎会释放请求占用的缓存块。问题是下一批手里已经拿到了块表，稍后还可能照着里面的地址读那一页。
 
-旧路径发现页中没有使用中的块，就直接调用 allocator 释放。IPC listener 即使先执行 CUDA synchronize，也只能等待已经提交的 GPU 工作。如果 Worker 正在 CPU 上准备下一批元数据，还没有 launch kernel，这次同步不会等待那个未来的访问。
+旧代码一看页里没剩下使用中的块，就撤销物理显存映射。哪怕此时等一次 GPU 同步也可能太早。worker 也许还在 CPU 上准备下一批，真正读取这页的任务甚至还没交给 GPU。
 
 ```mermaid
 sequenceDiagram
@@ -19,11 +19,11 @@ sequenceDiagram
     Note over W,G: 地址仍在，物理映射已经不在
 ```
 
-## 先退休，再沿 Worker 队列确认完成
+## 让释放排在最后一次读取之后
 
-修复把逻辑释放与物理释放拆开。空页先记录退休 epoch，保持映射；如果调度期间又用到它，取消旧的退休记录。只有仍然退休的页才进入释放流程。
+引擎启用批次队列时，管理器会记下空页，先保留物理映射。中途又有人用这页，就取消这次待释放记录。一轮工作提交完毕后，只有还有页要回收，引擎才会在队尾放一个确认任务。等所有预期的 worker 跑完前面的工作并同步设备，分配器就可以安全回收这些页。它可以把页留在备用池里，下次直接复用。只有实际撤销映射的页才会腾出显存。
 
-原始 engine step 返回后，包括 deferred sampling 的提交已经完成，再向 Worker 队列发送释放屏障。所有预期 Worker 完成前面的工作、同步各自设备并确认后，才执行事务化 unmap。只有 unmap 成功，物理容量账本才随之更新。
+`external_launcher` 只能向本地 worker 确认。使用流水线并行（PP > 1），或使用张量并行（TP > 1）并开启异步调度时，这个版本会在启动阶段拒绝该配置。[启动检查](https://github.com/ovg-project/kvcached/blob/6d2e3462b201f1c12ccca4e3e281d4233c8e2fc7/kvcached/integration/vllm/patches.py#L1175-L1191)
 
 ```mermaid
 sequenceDiagram
@@ -38,11 +38,15 @@ sequenceDiagram
     M->>W: 在已有工作后排入屏障
     W->>G: 完成前序工作并同步绑定设备
     W-->>M: 所有预期 Worker 确认
+    alt 留作备用
+    M->>M: 保留映射以便复用
+    else 归还显存
     M->>G: 事务化 unmap
     M->>M: 成功后更新物理容量
+    end
 ```
 
-公开 PR 中的 step wrapper 保留原生返回值，也不自行消费队列里的 future：
+下面是引擎一轮执行结束时的调用顺序。标记限定了这一次可以处理哪批待释放页。如果确认或回收失败，管理器会保留记录。分配器成功接收这些页后，管理器才会刷新缓存的容量读数。[引擎适配代码](https://github.com/ovg-project/kvcached/blob/6d2e3462b201f1c12ccca4e3e281d4233c8e2fc7/kvcached/integration/vllm/patches.py)
 
 ```python
 result = original_step(self, *args, **kwargs)
@@ -51,18 +55,8 @@ manager.release_retired_pages_through(marker)
 return result
 ```
 
-[合入版引擎适配代码](https://github.com/ovg-project/kvcached/blob/6d2e3462b201f1c12ccca4e3e281d4233c8e2fc7/kvcached/integration/vllm/patches.py)
+## 怎样检查页是在正确的时刻释放的
 
-## 事务与执行顺序不是一回事
+测试用受控的 worker 队列和真实 CUDA 页，分别检查正常释放、准备失败、成功响应丢失，以及等待释放的页被重新使用。复用场景还做了 16 次读回，确认页里的数据仍然可读。
 
-事务化 unmap 处理的是“多个映射变更是否一致成功”；队列屏障处理的是“释放时，之前的使用者是否已经结束”。两者缺一不可。没有退休页时不发屏障；屏障或 unmap 失败时保留退休所有权，不提前宣称容量已经释放。
-
-这里没有引入物理增长锁、容量准入或退避策略。是否需要延迟释放，看实际初始化出来的 batch queue，而不是仅凭 async 开关推断。无法建立全 rank 屏障的多 rank queued external launcher 会提前拒绝，不能把本地 Worker 的确认当作所有 Worker 的确认。
-
-## 验证到了哪里
-
-最终候选的公开记录包含真实 CUDA 页、受控 Worker 队列与 IPC listener 的故障探针：正常释放、丢失成功响应、prepare 失败，以及退休页复用的 16 次读回检查。它们验证映射保留和恢复，不等于完整多卡服务测试。
-
-单 T4、vLLM 0.28 V1、Qwen2.5-0.5B 的交替 A/B 中，两轮平均输出吞吐为旧 PR head 1625.39、新候选 1610.33 tok/s，低约 0.93%，不能写成加速。每轮请求和输出 token 完整，服务期无 CUDA 错误；主动退出后的清理警告另行记录，不宣称退出完全干净。该结果也不覆盖 TP/PP、MPS 或多实例性能。
-
-[PR #464：根因、边界与测试记录](https://github.com/ovg-project/kvcached/pull/464)
+服务测试用了单张 T4、vLLM 0.28 和 Qwen2.5-0.5B。旧 PR 版本和修复版交替各跑两轮，每轮 128 个请求都完成了，服务期间没有 CUDA 错误。平均输出吞吐分别为 1625.39 和 1610.33 tok/s，修复版在这组样本里低约 0.93%。主动退出后仍记录到清理警告，多卡执行另需验证。[故障测试与服务数据](https://github.com/ovg-project/kvcached/pull/464)

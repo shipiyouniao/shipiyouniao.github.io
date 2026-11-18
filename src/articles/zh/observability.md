@@ -1,10 +1,8 @@
-## 问题：看到容量数字，不等于知道它代表什么
+## 一个池子，三个不同的数
 
-弹性 KV 池同时存在逻辑 block、虚拟地址空间、已映射物理 page 和保留容量。只看“总容量减已使用”无法解释真实 GPU 占用，直接读取内部字段又把采集端绑定到了具体实现。
+在 PR 的 RTX 4090 测试里，一个小型 KV 缓存池留了 32 MiB 的地址空间，其中 8 MiB 已经映射到显存。此时按已分配块计算，用量只有 512 字节。三个数同时成立，回答的分别是「可以寻址多大」「已经有多少物理显存支撑」和「分配器登记了多少已分配块」。最后一项也包含管理器留作备用的块。
 
-这项 PR 提供只读观测接口，把字段含义、单位和池身份统一起来；它不是额度调度器，也不直接搭建 Prometheus 服务。
-
-## 旧路径：采集端自行拼接内部状态
+以前，监控得自己找管理器和分配器里的字段做换算。拿到某一层的大小，还得知道有多少层、每层有几个缓冲区，否则算出来的整池容量就会差一个倍数。
 
 ```mermaid
 sequenceDiagram
@@ -17,9 +15,9 @@ Note over C,A: 采集端自行推导单位与归属
 A-->>C: 多次读取之间计数可能变化
 ```
 
-同一个 mem_size 可能只是单层、单 buffer 的虚拟容量。如果采集端误当成整池容量，多层和 K/V 双 buffer 会把结果放大或缩小。另一个常见误区是把 reserved block 与 reserved page 当成同一概念。
+## 让缓存池自己报告用量
 
-## 新路径：注册池，按明确口径返回快照
+vLLM 和 SGLang 创建的池会登记到一个注册表里。引擎进程内的采集程序可以一次取出存活池的快照，也可以指定只取哪个引擎的数据。池名和分组编号都在返回值里，采集端按需筛选，再发给监控系统。注册表只保留弱引用，监控接入后，池仍然可以正常销毁。
 
 ```mermaid
 sequenceDiagram
@@ -35,25 +33,7 @@ M-->>C: 返回含明确单位的字段
 Note over M,A: 不代表全局原子快照
 ```
 
-弱引用注册表列出仍存活的池，不因为监控注册而延长池生命周期。采集端取得统一快照，再自行决定轮询频率、传输和展示方式。vLLM 与 SGLang 的适配层都可接入同一入口。
-
-物理容量影响可用 page，但不能超过逻辑空闲 page：
-
-```python
-free_pages = _call_int(allocator, "get_num_free_pages")
-reserved_pages = _call_int(allocator, "get_num_reserved_pages")
-available_physical_pages = _call_int(allocator, "get_avail_physical_pages")
-if free_pages is None or reserved_pages is None or available_physical_pages is None:
-    effective_free_pages = None
-else:
-    effective_free_pages = min(free_pages, available_physical_pages + reserved_pages)
-```
-
-[源码：有效空闲页计算，第 166–173 行](https://github.com/ovg-project/kvcached/blob/c85bac20e5ccb04766f995512abbff0dfbca1055/kvcached/observability.py#L166-L173)
-
-缺失的底层能力用 None 表达。不能把“未知”变成 0，否则图表会误报容量耗尽。
-
-## 单位与字段之间的关系
+从单个缓冲区算到整个池，用到下面这几项。逻辑空间里空着的页还要看能否拿到物理显存，才能估算当前可用量。底层缺少这项数据时，接口会报告未知，图表也就能区分「没读到」和「真的用光了」。[字节换算](https://github.com/ovg-project/kvcached/blob/c85bac20e5ccb04766f995512abbff0dfbca1055/kvcached/observability.py#L183-L186) · [可用页计算](https://github.com/ovg-project/kvcached/blob/c85bac20e5ccb04766f995512abbff0dfbca1055/kvcached/observability.py#L166-L173)
 
 ```python
 virtual_bytes_per_buffer = _int_attr(manager, "mem_size") or 0
@@ -62,29 +42,8 @@ block_size_bytes = _int_attr(manager, "block_mem_size") or 0
 bytes_per_block = block_size_bytes * num_layers * num_kv_buffers
 ```
 
-[源码：容量单位换算，第 183–186 行](https://github.com/ovg-project/kvcached/blob/c85bac20e5ccb04766f995512abbff0dfbca1055/kvcached/observability.py#L183-L186)
+## 分出去的 32 个块还能看见吗？
 
-| 字段或概念          | 含义                                           | 不能据此推断                    |
-| ------------------- | ---------------------------------------------- | ------------------------------- |
-| virtual total bytes | 所有层、所有 buffer 的虚拟容量                 | 不能当作已占物理显存            |
-| mapped bytes        | 已映射的物理存储量                             | 不等于所有 GPU 进程总占用       |
-| allocated blocks    | 管理器分配账本，包含 reserved blocks           | 不能再无条件加一次 reserved     |
-| available blocks    | 当前可分配量，也可能包含可复用 reserved blocks | 不是与 allocated 严格互斥的集合 |
-| reserved pages      | 物理 page 级保留                               | 不等于 block 级保留数           |
+测试先读一次，然后分配 32 个块、再归还。快照中的块数依次为 1、33、1，按块计算的用量也从 512 字节升到 16,896 字节，再回到 512。这个例子能直接检查单位和字段是否对应得上。[RTX 4090 测试记录](https://github.com/ovg-project/kvcached/pull/385)
 
-这些字段服务于不同问题，不应随意相加生成“总量”。
-
-## 一致性边界
-
-快照入口可以借用管理器的同步机制，但 Python 管理器锁并不自动覆盖 C++ 后台预分配线程。因此本 PR 合入时的多个计数读取不能被描述成“整池同一瞬间的原子快照”。
-
-这也是后续改进计数器并发安全和快照一致性的基础：先定义清楚字段，再针对写入者的同步边界改进，而不是让采集端猜测。
-
-## 验证与使用注意
-
-[PR #385](https://github.com/ovg-project/kvcached/pull/385) 记录了 CPU 测试和 RTX 4090 上真实 CUDA VMM 池验证。该样例分配块数为 1 → 33 → 1，对应 allocated bytes 为 512 → 16896 → 512；虚拟总量为 33554432 bytes，映射量为 8388608 bytes。这些数据属于该测试池，不是通用模型配置。
-
-- 监控采集不应该触发扩容、缩容或调度策略。
-- 采集周期需要考虑查询成本，不应为了图表刷新直接进入高频调度热路径。
-- 指标缺失先区分“能力不可用”“未注册池”和“采集进程加载了旧版本”。
-- 本文按合入版本解释接口，不把后续原子计数改进倒写成此 PR 已具备的能力。
+这版接口逐项读取底层计数。遇到后台线程同时调整池大小时，几个计数可能来自不同的时刻。后来的 [#443 手记](#/notes/allocator-snapshots) 讲了怎样让分配器一次读出彼此一致的页数。
