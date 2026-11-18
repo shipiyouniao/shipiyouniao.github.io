@@ -9,7 +9,6 @@ import {
   GitPullRequest,
   Gamepad2,
   MapPin,
-  Mail,
   Search,
   ArrowLeft,
   Printer,
@@ -31,12 +30,20 @@ const home = computed(() => route.path === "/");
 const article = computed(() =>
   contributions.find((item) => item.slug === route.params.slug),
 );
+const notesByDate = [...contributions].sort((a, b) =>
+  b.date.localeCompare(a.date),
+);
 const query = ref("");
 const filteredNotes = computed(() =>
-  contributions.filter((item) =>
-    `${t(item.slug + ".title")} ${t(item.slug + ".summary")} ${item.repo} ${item.number}`
+  notesByDate.filter((item) =>
+    `${t(item.slug + ".title")} ${t(item.slug + ".summary")} ${item.repo} ${item.number} ${item.slug} ${item.topics}`
       .toLowerCase()
-      .includes(query.value.toLowerCase()),
+      .includes(
+        query.value
+          .trim()
+          .toLowerCase()
+          .replace(/#(?=\d)/g, ""),
+      ),
   ),
 );
 const copied = ref(false);
@@ -69,75 +76,48 @@ function dateLabel(date) {
 }
 </script>
 <template>
-  <template v-if="home">
-    <section class="hero">
+  <section v-if="home" class="shell hero">
+    <div class="hero-content">
+      <p class="hero-location"><MapPin :size="15" />{{ t("location") }}</p>
+      <h1>{{ t("name") }}</h1>
+      <p class="hero-handle">
+        {{ locale === "zh" ? "shipiyouniao" : "石皮幼鸟" }}
+      </p>
+      <p class="hero-description">{{ t("intro") }}</p>
+      <p class="hero-detail">{{ t("interests") }}</p>
+      <div class="hero-links">
+        <RouterLink class="button primary" to="/projects"
+          >{{ t("projects") }} <ArrowRight :size="16"
+        /></RouterLink>
+        <RouterLink class="text-link" to="/about"
+          >{{ t("about") }} <ArrowRight :size="16"
+        /></RouterLink>
+      </div>
+    </div>
+    <figure class="hero-photo">
       <img
         class="hero-image"
         src="/images/mountains.jpg"
         :alt="t('mountainAlt')"
         fetchpriority="high"
       />
-      <div class="hero-wash"></div>
-      <div class="shell hero-content">
-        <div class="eyebrow">
-          <span class="status-dot"></span>{{ t("eyebrow") }}
-        </div>
-        <h1>{{ t("name") }}<span class="name-dot">.</span></h1>
-        <p class="hero-handle">
-          {{ locale === "zh" ? "shipiyouniao" : "石皮幼鸟" }}
-        </p>
-        <p class="hero-description">{{ t("hero1") }}<br />{{ t("hero2") }}</p>
-        <p class="hero-detail">{{ t("role") }}<br />{{ t("focus") }}</p>
-        <div class="flex flex-wrap items-center gap-3 mt-7">
-          <RouterLink class="button primary" to="/projects"
-            >{{ t("seeWork") }} <ArrowUpRight :size="17" /></RouterLink
-          ><RouterLink class="button glass" to="/about"
-            >{{ t("about") }} <ArrowRight :size="16"
-          /></RouterLink>
-        </div>
-        <div class="hero-foot">
-          <span><MapPin :size="13" />{{ t("location") }}</span
-          ><span>{{ t("curious") }}</span>
-        </div>
-      </div>
-      <a
-        class="photo-credit"
-        href="https://unsplash.com"
-        target="_blank"
-        rel="noopener noreferrer"
-        >{{ t("photoCredit") }} <ArrowUpRight :size="11"
-      /></a>
-    </section>
-    <section class="shell section home-intro">
-      <div class="section-heading">
-        <div>
-          <span class="eyebrow">{{ t("introEyebrow") }}</span>
-          <h2>{{ t("introTitle") }}</h2>
-        </div>
-        <RouterLink class="text-link" to="/about"
-          >{{ t("meet") }} <ArrowUpRight :size="16"
-        /></RouterLink>
-      </div>
-      <div class="intro-grid">
-        <p class="intro-lead">{{ t("introLead") }}</p>
-        <div>
-          <p>{{ t("introBody") }}</p>
-          <p class="mt-3">{{ t("introFun") }}</p>
-        </div>
-      </div>
-    </section>
-  </template>
+      <figcaption>
+        <a
+          class="photo-credit"
+          href="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Unsplash <ArrowUpRight :size="12"
+        /></a>
+      </figcaption>
+    </figure>
+  </section>
   <section
     v-if="home || route.path === '/notes'"
     class="shell section notes-section"
   >
     <div class="section-heading">
-      <div>
-        <span class="eyebrow">{{ t("notesEyebrow") }}</span
-        ><component :is="home ? 'h2' : 'h1'"
-          >{{ t("notesTitle") }}<span class="heading-dot"> / </span></component
-        >
-      </div>
+      <component :is="home ? 'h2' : 'h1'">{{ t("notes") }}</component>
       <RouterLink v-if="home" class="text-link" to="/notes"
         >{{ t("allNotes") }} <ArrowUpRight :size="16" /></RouterLink
       ><span v-else class="muted">{{
@@ -155,20 +135,22 @@ function dateLabel(date) {
     </div>
     <div class="notes-grid">
       <RouterLink
-        v-for="item in home ? contributions.slice(-3) : filteredNotes"
+        v-for="item in home ? notesByDate.slice(0, 3) : filteredNotes"
         :key="item.slug"
         :to="`/notes/${item.slug}`"
         class="note-card"
         ><div class="note-meta">
-          <span>{{ item.repo }} #{{ item.number }}</span
-          ><span>{{ t("merged") }}</span>
+          <GitPullRequest :size="15" /><span
+            >{{ item.repo }} #{{ item.number }}</span
+          >
         </div>
-        <div class="note-symbol"><GitPullRequest :size="25" /></div>
-        <h3>{{ t(item.slug + ".title") }}</h3>
+        <component :is="home ? 'h3' : 'h2'">{{
+          t(item.slug + ".title")
+        }}</component>
         <p>{{ t(item.slug + ".summary") }}</p>
         <div class="note-bottom">
           <time :datetime="item.date">{{ dateLabel(item.date) }}</time
-          ><ArrowUpRight :size="19" /></div
+          ><ArrowRight :size="17" /></div
       ></RouterLink>
     </div>
     <p v-if="!home && !filteredNotes.length" class="empty">{{ t("empty") }}</p>
@@ -178,13 +160,10 @@ function dateLabel(date) {
     class="shell section projects-section"
   >
     <div class="section-heading">
-      <div>
-        <span class="eyebrow">{{ t("workEyebrow") }}</span
-        ><component :is="home ? 'h2' : 'h1'"
-          >{{ t("workTitle") }}<span class="heading-dot"> / </span></component
-        >
-      </div>
-      <span class="muted">{{ t("workSubtitle") }}</span>
+      <component :is="home ? 'h2' : 'h1'">{{ t("projects") }}</component>
+      <RouterLink v-if="home" class="text-link" to="/projects"
+        >{{ t("allProjects") }} <ArrowUpRight :size="16"
+      /></RouterLink>
     </div>
     <div class="project-row game-project">
       <a class="project-image" href="https://shipiyouniao.github.io/minefarer/"
@@ -210,19 +189,16 @@ function dateLabel(date) {
         </div>
       </div>
     </div>
-    <div class="opensource-row">
-      <div>
+    <div class="opensource-row" :class="{ compact: home }">
+      <div class="repository-intro">
         <span class="project-kicker"
           ><Code2 :size="15" />{{ t("openSource") }}</span
         >
         <h3>KVCached</h3>
         <p>{{ t("kvText") }}</p>
-        <RepositoryStats repo="ovg-project/kvcached" />
-        <a class="text-link mt-5" href="https://github.com/ovg-project/kvcached"
-          >{{ t("repo") }} <ArrowUpRight :size="16"
-        /></a>
       </div>
-      <div class="contribution-list">
+      <RepositoryStats repo="ovg-project/kvcached" />
+      <div v-if="!home" class="contribution-list">
         <a
           v-for="item in [538, 464, 518].map((number) =>
             contributions.find(
@@ -258,8 +234,7 @@ function dateLabel(date) {
   <section v-if="route.path === '/about'" class="shell section about-page">
     <div class="section-heading">
       <div>
-        <span class="eyebrow">{{ t("behind") }}</span>
-        <h1>{{ t("hello") }}</h1>
+        <h1>{{ t("name") }}</h1>
       </div>
       <button
         class="icon-button print-button"
@@ -427,11 +402,7 @@ function dateLabel(date) {
     class="shell section video-section"
   >
     <div class="section-heading">
-      <div>
-        <span class="eyebrow">{{ t("biliEyebrow") }}</span>
-        <h2>{{ t("biliTitle") }}</h2>
-      </div>
-      <Tv :size="25" class="bili-icon" />
+      <h2>{{ t("biliTitle") }}</h2>
     </div>
     <div class="video-layout">
       <div>
@@ -493,12 +464,5 @@ function dateLabel(date) {
         /></a>
       </div>
     </div>
-  </section>
-  <section v-if="home" class="shell closing">
-    <span class="eyebrow">{{ t("connect") }}</span>
-    <h2>{{ t("closing") }}</h2>
-    <a class="text-link" href="mailto:2960474346@qq.com"
-      ><Mail :size="17" />{{ t("sayHi") }} <ArrowUpRight :size="16"
-    /></a>
   </section>
 </template>

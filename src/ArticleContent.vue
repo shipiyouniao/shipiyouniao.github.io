@@ -89,18 +89,20 @@ function jump(id) {
           {{ heading.label }}
         </button>
       </nav>
-      <template v-for="(block, index) in blocks" :key="index">
-        <CodeBlock
-          v-if="block.type === 'code'"
-          :code="block.code"
-          :language="block.language"
-        />
-        <SequenceDiagram
-          v-else-if="block.type === 'diagram'"
-          :source="block.code"
-        />
-        <div v-else class="article-prose" v-html="block.html"></div>
-      </template>
+      <div class="article-reading">
+        <template v-for="(block, index) in blocks" :key="index">
+          <CodeBlock
+            v-if="block.type === 'code'"
+            :code="block.code"
+            :language="block.language"
+          />
+          <SequenceDiagram
+            v-else-if="block.type === 'diagram'"
+            :source="block.code"
+          />
+          <div v-else class="article-prose" v-html="block.html"></div>
+        </template>
+      </div>
     </template>
   </div>
 </template>

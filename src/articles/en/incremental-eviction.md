@@ -1,8 +1,8 @@
-## One block changes; the whole pool gets rebuilt
+## What did the CPU do to free one block?
 
-A prefix-cache cap keeps useful blocks without retaining unlimited memory. The old trim path enforced that cap by walking evictable blocks, regrouping them by physical page and sorting candidates. As the retained pool grew, even a single-block release paid for reorganizing the whole pool.
+A prefix cache holds on to computed blocks so later requests can reuse them. When it exceeds its cap, the pool has to choose some blocks to evict. The old code grouped every eligible block by physical page and sorted the candidates to find the cheapest page. Freeing a single block could send it through the entire pool again.
 
-This was CPU scheduling work, not a slower GPU kernel. Retaining 1,000 blocks while repeatedly freeing one block made the cost measurable in isolation.
+Holding the cache at 1,000 blocks and freeing one block at a time made that CPU cost easy to measure.
 
 ```mermaid
 sequenceDiagram
@@ -16,11 +16,14 @@ sequenceDiagram
     Note over R,P: Repeat full-pool work on the next small change
 ```
 
-## Keep unchanged pages in the index
+## Remember which pages changed
 
-The replacement maintains a page-level eviction index. Adding, removing or reusing a block marks its page dirty. Trimming refreshes those pages rather than rebuilding every candidate. A heap preserves cost and recency ordering; versioned entries invalidate stale candidates, and periodic compaction bounds heap growth.
+When a block enters the cache, leaves it, or gets reused, the index records the page it belongs to. The next trim updates those pages and reuses the existing order for the rest. Before evicting a selected page, it checks occupancy with the manager because a pending copy or another user may still hold a block there. [Page index](https://github.com/ovg-project/kvcached/blob/9677e504960edd4ccc7a820592e28b5df7bbd9f3/kvcached/integration/vllm/page_eviction.py)
 
-The manager remains the authority on physical occupancy. A page can contain a null block or blocks retained for pending copies, so the prefix index alone cannot prove that the entire page is releasable. Selected pages receive another occupancy check. LRU top-up stops once it has enough victims.
+```python
+def changed(self, block_ids: Iterable[int]) -> None:
+    self.dirty.update(self.page_id(bid) for bid in block_ids)
+```
 
 ```mermaid
 sequenceDiagram
@@ -35,25 +38,10 @@ sequenceDiagram
     I-->>B: Return victims within budget
 ```
 
-The merged `changed()` method records affected pages instead of rebuilding the pool:
+The manager can also free a block outside the cache index. It needs to tell the index which pages changed, or an eligible page could stay off the list indefinitely. If the pool still needs more victims, it takes the least recently used blocks and stops once it has enough.
 
-```python
-def changed(self, block_ids: Iterable[int]) -> None:
-    self.dirty.update(self.page_id(bid) for bid in block_ids)
-```
+## Repeat the measurement at the same cache size
 
-[Merged PageEvictionIndex source](https://github.com/ovg-project/kvcached/blob/9677e504960edd4ccc7a820592e28b5df7bbd9f3/kvcached/integration/vllm/page_eviction.py)
+On a T4, both versions retained 1,000 blocks with 256 MiB mapped. Across 2,000 single-block frees after warmup, mean trim time fell from 260.5 to 17.4 microseconds with contiguous blocks, and from 259.6 to 17.5 with scattered blocks. After the manager’s release notification was added, the mean was around 19–20 microseconds.
 
-## What the measurements establish
-
-The initial public experiment used a T4, vLLM 0.28, real native metadata and CUDA backing. With 1,000 retained blocks and 2,000 measured single-block frees after warmup, mean contiguous trim time fell from 260.5 to 17.4 microseconds. Non-contiguous trim fell from 259.6 to 17.5 microseconds. A follow-up with localized manager-release notifications measured around 19–20 microseconds.
-
-These are eviction microbenchmarks, not a claim that model serving became an order of magnitude faster. Both arms retained 1,000 blocks with 256 MiB mapped. Victim-order comparisons, bounded-work regressions and real CUDA release checks help distinguish implementation savings from retaining less cache or changing the policy.
-
-## The easily missed invalidation path
-
-Every occupancy-changing path must update the index, including manager-side releases outside ordinary block-pool methods. Those notifications must stay local to affected pages; invalidating everything on every release would recreate the original cost.
-
-The strict cap and cheapest-page/LRU policy remain intact. This change reduces the cost of enforcing that policy rather than introducing a new scheduling policy.
-
-[PR #538 and public validation](https://github.com/ovg-project/kvcached/pull/538)
+The cap was the same in both versions. Regression tests also compared the order in which they evicted blocks. The timings measure the scheduler’s work on a single trim. [Benchmark setup and results](https://github.com/ovg-project/kvcached/pull/538)

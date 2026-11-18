@@ -1,6 +1,8 @@
-## The problem: a peer's memory growth becomes your estimated cost
+## More free memory made startup fail
 
-vLLM profiles non-KV costs using device-wide free-memory observations and process-local PyTorch counters. Another instance loading weights, growing KV mappings or releasing memory can contaminate the difference. A public report recorded free memory rising from 8.57 GiB to 12.91 GiB during profiling and triggering a startup assertion.
+vLLM runs the model at startup to estimate how much memory it can leave for the KV cache. In one shared-GPU run, the device reported 8.57 GiB free before profiling and 12.91 GiB afterward. The check expected profiling to consume memory. Seeing the change go the other way, it stopped the engine.
+
+The readings covered every process on the card. Even if the instances started one at a time, the first could keep serving traffic and releasing memory while the second measured itself. [Failure report](https://github.com/ovg-project/kvcached/pull/448)
 
 ```mermaid
 sequenceDiagram
@@ -12,9 +14,18 @@ A->>B: Read final free memory
 B-->>A: Attribute peer delta to B
 ```
 
-## The fix: separate logical capacity from physical admission
+## Size the address space for this instance
 
-With KVCached enabled, establish a stable budget from total memory and utilization, then deduct local weights and the Torch peak increase. Keep required model profiling and supported CUDA Graph profiling without using peer-driven memory deltas for logical KV sizing. Explicit kv_cache_memory_bytes and disabled-KVCached behavior retain their contracts.
+An explicit `kv_cache_memory_bytes` setting goes through vLLM’s original method. When KVCached is enabled and the budget is calculated automatically, vLLM starts with total device memory times the configured utilization. It subtracts this instance’s weights and the increase in peak PyTorch memory during profiling. The result sizes the virtual space for its KV cache. Here is the simplified calculation. [Merged implementation](https://github.com/ovg-project/kvcached/blob/f8bbb005ed5c1eb9285e2e8f2afa7fc83b8da052/kvcached/integration/vllm/patches.py#L2071-L2126)
+
+```python
+# Simplified capacity formula, not the full worker method.
+available_memory = (
+    virtual_budget
+    - weights_memory
+    - torch_peak_increase
+)
+```
 
 ```mermaid
 sequenceDiagram
@@ -26,27 +37,8 @@ A->>B: Build virtual KV pool
 B-->>A: Check physical capacity during growth
 ```
 
-```python
-# Simplified capacity formula, not the full worker method.
-available_memory = (
-    virtual_budget
-    - weights_memory
-    - torch_peak_increase
-)
-```
+When the cache grows, the allocator checks whether it can actually back another page. Startup can still wait if the first physical page never becomes available. In SGLang, each rank calculates its own capacity and the group takes the smallest value so the individual pools agree on their size.
 
-[Source at the merged revision](https://github.com/ovg-project/kvcached/blob/f8bbb005ed5c1eb9285e2e8f2afa7fc83b8da052/kvcached/integration/vllm/patches.py#L2071-L2126)
+## What the startup checks missed
 
-## Why a startup lock is insufficient
-
-After A releases its startup lock, it starts serving and changing memory use. B can hold the same lock while A continues allocating. Starting C later has the same problem. Serializing initializers cannot make device-wide counters process-local; pausing every serving peer would affect live traffic.
-
-## Validation and limits
-
-The PR records T4 startup and OK responses with vLLM 0.24.0 and SGLang 0.5.15. CUDA Graph was disabled in that SGLang smoke test, so it does not establish graph-capture coverage. The SGLang path reduces rank-local capacity with MIN to preserve common geometry; any rank-query failure coordinates fallback to avoid divergent collectives.
-
-## Pitfalls
-
-Virtual capacity is not free physical memory and cannot make an infeasible deployment fit. Weights, graphs, communication and physical KV pages still consume memory. Null-block reservation may wait indefinitely when no page becomes available. This PR also omitted inference_mode and introduced a multimodal profiling regression, subsequently fixed in #461. That coverage gap is part of the engineering record.
-
-[PR #448](https://github.com/ovg-project/kvcached/pull/448)
+On one T4, vLLM 0.24.0 and SGLang 0.5.15 each started and answered a request. The SGLang run had CUDA Graph disabled. A later multimodal run exposed a separate omission in the replacement vLLM method. Its vision encoder used over ten extra GiB during profiling. The [follow-up note](#/notes/inference-mode) traces that regression. [Startup tests](https://github.com/ovg-project/kvcached/pull/448)

@@ -1,10 +1,8 @@
-## The problem: a capacity number needs a definition
+## Three valid sizes for one pool
 
-Elastic KV pools expose logical blocks, virtual address capacity, mapped physical pages and reserved capacity. Subtracting used from total does not necessarily describe GPU memory occupancy. Reading private fields also couples collectors to implementation details.
+In the PR’s RTX 4090 test, a small KV cache pool reserved 32 MiB of address space. GPU memory backed 8 MiB of it. The blocks allocated at the first reading accounted for just 512 bytes. The block count includes blocks the manager keeps in reserve. Those numbers answer three different questions about the same pool.
 
-This PR establishes a read-only interface with explicit units and pool identity. It is neither a quota scheduler nor a Prometheus server.
-
-## Before: every collector reconstructs pool state
+Monitoring used to have to extract the figures from private manager and allocator fields. A size reported for one layer and one buffer still needed multiplying by the correct number of layers and buffers to describe the whole pool.
 
 ```mermaid
 sequenceDiagram
@@ -17,9 +15,9 @@ Note over C,A: Units and ownership must be reconstructed
 A-->>C: Counters can change between reads
 ```
 
-A mem_size may describe one buffer in one layer, not the entire pool. Ignoring layer count or separate K/V buffers changes the meaning of the result. Reserved blocks and reserved pages are another pair of distinct concepts.
+## Ask the pool for its own figures
 
-## After: discover live pools and request named snapshots
+Pools created by vLLM and SGLang register themselves. Inside the engine process a collector can request snapshots for the live pools, optionally by integration. It can then filter the results by pool name or group ID and forward them to its monitoring service. The registry uses weak references so a collector can discover a pool without keeping it alive.
 
 ```mermaid
 sequenceDiagram
@@ -35,25 +33,7 @@ M-->>C: Named fields with explicit units
 Note over M,A: Not a global atomic snapshot
 ```
 
-A weak-reference registry discovers pools without extending their lifetime. Collectors choose their own polling frequency, transport and presentation. The same entry point supports vLLM and SGLang integration.
-
-Effective free pages cannot exceed logical free pages:
-
-```python
-free_pages = _call_int(allocator, "get_num_free_pages")
-reserved_pages = _call_int(allocator, "get_num_reserved_pages")
-available_physical_pages = _call_int(allocator, "get_avail_physical_pages")
-if free_pages is None or reserved_pages is None or available_physical_pages is None:
-    effective_free_pages = None
-else:
-    effective_free_pages = min(free_pages, available_physical_pages + reserved_pages)
-```
-
-[Effective free pages, lines 166–173](https://github.com/ovg-project/kvcached/blob/c85bac20e5ccb04766f995512abbff0dfbca1055/kvcached/observability.py#L166-L173)
-
-Unavailable allocator capabilities remain None. Unknown must not silently become zero and look like exhausted capacity.
-
-## Units and overlapping quantities
+This code converts per-buffer sizes to pool-level units. Available capacity also depends on whether the free logical pages can be backed by GPU memory. If an allocator cannot provide that figure, the snapshot reports it as unknown so a dashboard can distinguish a missing reading from an exhausted pool. [Byte accounting](https://github.com/ovg-project/kvcached/blob/c85bac20e5ccb04766f995512abbff0dfbca1055/kvcached/observability.py#L183-L186) · [Available pages](https://github.com/ovg-project/kvcached/blob/c85bac20e5ccb04766f995512abbff0dfbca1055/kvcached/observability.py#L166-L173)
 
 ```python
 virtual_bytes_per_buffer = _int_attr(manager, "mem_size") or 0
@@ -62,29 +42,8 @@ block_size_bytes = _int_attr(manager, "block_mem_size") or 0
 bytes_per_block = block_size_bytes * num_layers * num_kv_buffers
 ```
 
-[Unit conversion, lines 183–186](https://github.com/ovg-project/kvcached/blob/c85bac20e5ccb04766f995512abbff0dfbca1055/kvcached/observability.py#L183-L186)
+## Allocate 32 blocks, read the counters, then give them back
 
-| Quantity            | Meaning                                           | Important limit                                    |
-| ------------------- | ------------------------------------------------- | -------------------------------------------------- |
-| Virtual total bytes | Virtual capacity across layers and buffers        | Not physical GPU occupancy                         |
-| Mapped bytes        | Mapped physical storage                           | Not all processes' GPU memory                      |
-| Allocated blocks    | Allocation accounting including reserved blocks   | Do not add reserved blocks again                   |
-| Available blocks    | Allocatable capacity, including reusable reserves | Not necessarily disjoint from allocated accounting |
-| Reserved pages      | Physical page reserves                            | Not block-level reserves                           |
+Across the three readings the block count went from 1 to 33 and back to 1. The corresponding byte count rose from 512 to 16,896 and returned to 512. That gives the collector a known change against which to check the units. [RTX 4090 test](https://github.com/ovg-project/kvcached/pull/385)
 
-These fields answer different questions. Adding them arbitrarily does not produce a meaningful total.
-
-## Snapshot consistency
-
-The manager snapshot entry can use manager synchronization, but a Python manager lock does not automatically serialize a C++ background preallocation thread. Multiple counter reads at this merged revision must not be presented as a globally atomic snapshot.
-
-Explicit accounting is a foundation for subsequent concurrency improvements, not proof that every writer already shares a lock.
-
-## Validation and operational pitfalls
-
-[PR #385](https://github.com/ovg-project/kvcached/pull/385) records CPU tests and a real CUDA VMM pool test on RTX 4090. Allocated blocks followed 1 → 33 → 1, and allocated bytes 512 → 16896 → 512. Virtual total capacity was 33554432 bytes and mapped capacity 8388608 bytes. These numbers describe that test pool, not a general model configuration.
-
-- Collection must not silently grow or trim a pool.
-- Choose a polling frequency appropriate to query cost.
-- Distinguish unsupported fields from undiscovered pools and stale deployed code.
-- Later atomic-counter improvements are not retroactive properties of this PR.
+This first interface read the underlying counters one at a time. If a background thread resized the pool, different fields could describe different moments. A [later change](#/notes/allocator-snapshots) added a consistent set of allocator page counts.

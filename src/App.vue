@@ -27,7 +27,10 @@ watchEffect(() => {
   document.title = `${article ? t(article.slug + ".title") : t(key)} · ${t("name")}`;
   document
     .querySelector('meta[name="description"]')
-    ?.setAttribute("content", t("description"));
+    ?.setAttribute(
+      "content",
+      article ? t(article.slug + ".summary") : t("description"),
+    );
 });
 function focusMain(event) {
   event.preventDefault();
@@ -39,8 +42,13 @@ function focusMain(event) {
   <header class="site-header">
     <div class="nav-wrap">
       <RouterLink to="/" class="brand"
-        ><span class="brand-mark">S<span>.</span></span
-        ><span>{{ t("name") }}<small>shipiyouniao</small></span></RouterLink
+        ><img
+          class="brand-mark"
+          src="/images/avatar.png"
+          width="32"
+          height="32"
+          alt=""
+        /><span>{{ t("name") }}</span></RouterLink
       >
       <nav class="desktop-nav" :aria-label="t('nav')">
         <RouterLink
@@ -87,17 +95,13 @@ function focusMain(event) {
   </header>
   <main id="main" tabindex="-1"><RouterView /></main>
   <footer class="footer shell">
-    <div>
-      <strong>{{ t("name") }}<span class="text-emerald-700">.</span></strong>
-      <p>{{ t("footer") }}</p>
-    </div>
+    <span>© {{ new Date().getFullYear() }} shipiyouniao</span>
     <div class="footer-links">
       <a href="https://github.com/shipiyouniao"
         >GitHub <ArrowUpRight :size="13" /></a
       ><a :href="bilibili" target="_blank" rel="noopener noreferrer"
         >Bilibili <ArrowUpRight :size="13" /></a
-      ><a href="mailto:2960474346@qq.com">Email <ArrowUpRight :size="13" /></a
-      ><span>© {{ new Date().getFullYear() }} shipiyouniao</span>
+      ><a href="mailto:2960474346@qq.com">Email <ArrowUpRight :size="13" /></a>
     </div>
   </footer>
 </template>

@@ -1,6 +1,7 @@
 export const contributions = [
   {
     slug: "allocator-snapshots",
+    topics: "allocator snapshot atomic mutex 计数器 快照",
     repo: "KVCached",
     number: 443,
     date: "2026-08-17",
@@ -8,6 +9,7 @@ export const contributions = [
   },
   {
     slug: "shared-gpu-startup",
+    topics: "shared GPU startup virtual KV capacity profiling 同卡多实例",
     repo: "KVCached",
     number: 448,
     date: "2026-08-20",
@@ -15,6 +17,7 @@ export const contributions = [
   },
   {
     slug: "inference-mode",
+    topics: "inference_mode inference mode PyTorch autograd profiling 多模态",
     repo: "KVCached",
     number: 461,
     date: "2026-08-23",
@@ -22,6 +25,7 @@ export const contributions = [
   },
   {
     slug: "prefix-cache",
+    topics: "prefix cache hash block ID 前缀缓存",
     repo: "KVCached",
     number: 402,
     date: "2026-08-06",
@@ -29,6 +33,7 @@ export const contributions = [
   },
   {
     slug: "observability",
+    topics: "observability KV cache metrics snapshot 可观测性 快照",
     repo: "KVCached",
     number: 385,
     date: "2026-08-08",
@@ -36,6 +41,7 @@ export const contributions = [
   },
   {
     slug: "worker-rpc",
+    topics: "worker RPC CPU tensor dequeue 反序列化",
     repo: "vLLM",
     number: 51979,
     date: "2026-08-24",
@@ -43,6 +49,7 @@ export const contributions = [
   },
   {
     slug: "hybrid-retry",
+    topics: "hybrid cache Mamba rollback allocation retry 混合缓存 回滚",
     repo: "KVCached",
     number: 518,
     date: "2026-09-28",
@@ -50,6 +57,7 @@ export const contributions = [
   },
   {
     slug: "async-unmap",
+    topics: "async unmap CUDA worker barrier 异步释放",
     repo: "KVCached",
     number: 464,
     date: "2026-09-29",
@@ -57,6 +65,7 @@ export const contributions = [
   },
   {
     slug: "incremental-eviction",
+    topics: "page eviction index LRU cache cap 淘汰 裁剪",
     repo: "KVCached",
     number: 538,
     date: "2026-10-06",

@@ -1,8 +1,6 @@
-## What state does a retry actually start from?
+## The first group had already changed when the second ran out of memory
 
-An elastic physical allocation can fail recoverably: return an allocation miss and let scheduling retry later. But a hybrid allocation spans several cache groups. An earlier group may already own blocks, move hashes, increment references and queue a Mamba state copy before a later group runs out of physical capacity.
-
-Catching the exception and returning None repairs the caller-visible result, not the mutated state. Waiting requests do not automatically unwind those allocations. Freeing the entire request is also wrong for a running request whose earlier blocks remain in use.
+A request may need space for both attention data and Mamba state. vLLM allocates the cache groups in turn. If the second group runs out of memory, the scheduler can try again later. By then the first group may already have moved a cache key, taken another reference to the source block, and queued a state copy. The next attempt would inherit those changes.
 
 ```mermaid
 sequenceDiagram
@@ -19,7 +17,7 @@ sequenceDiagram
     Note over S,A: Partial mutations survive into retry
 ```
 
-Native vLLM 0.29 performs these operations during allocation, before the worker has to begin computation:
+These three lines run during allocation. They record a future copy and keep its source block alive. The worker has yet to run the model. [vLLM’s Mamba allocator](https://github.com/vllm-project/vllm/blob/98dff2a81d747d1dba01a47f939f48c3526d4206/vllm/v1/core/single_type_kv_cache_manager.py#L1737-L1755)
 
 ```python
 self.block_pool.move_block_hashes(source_block, cow_block)
@@ -27,11 +25,9 @@ self._pending_cow_copies.append((source_block, cow_block))
 source_block.ref_cnt += 1
 ```
 
-[Corresponding vLLM source](https://github.com/vllm-project/vllm/blob/98dff2a81d747d1dba01a47f939f48c3526d4206/vllm/v1/core/single_type_kv_cache_manager.py#L1737-L1755)
+## Undo only what this attempt added
 
-## Undo only the unpublished attempt
-
-The fix captures necessary state after native skipped-block release and before the first allocation mutation. On a physical miss, it restores this attempt's request tables and Mamba bookkeeping, reverses its hash moves, truncates only newly appended copy/offload records, and releases surplus references through the existing reference-aware pool. Earlier ownership and already queued copies stay intact.
+A running request still needs blocks allocated on earlier steps. The rollback applies to the cache coordinator in vLLM 0.28.x and 0.29.x. It records the existing request state after vLLM frees its skipped blocks and before this attempt makes its first change. On a recoverable failure it restores the keys and metadata moved by this attempt, removes its new copy records, and drops its extra references. Earlier blocks and queued work survive the retry. [Rollback implementation](https://github.com/ovg-project/kvcached/blob/32858759eb11d94a1cc34aaf65004da70b46c5e9/kvcached/integration/vllm/allocation_attempt.py)
 
 ```mermaid
 sequenceDiagram
@@ -50,20 +46,14 @@ sequenceDiagram
     Note over M,P: No new direct physical unmap path
 ```
 
-[Merged allocation_attempt.py](https://github.com/ovg-project/kvcached/blob/32858759eb11d94a1cc34aaf65004da70b46c5e9/kvcached/integration/vllm/allocation_attempt.py)
+## A second bug surfaced on a later cache hit
 
-## An old boundary must not name an advanced state
+Suppose the cache contains the Mamba state after token B. After another token, the working block has advanced to B+1, but the asynchronous scheduler may still see a request length of B. Publishing that working block under B again could give the next request a state one step ahead of where it should start.
 
-Mamba running state advances during decode. At prompt boundary B, a copy preserves the checkpoint while the source continues toward B+1. If async scheduling republishes that running source under B using a stale request length, the next copy can store an advanced state under the boundary-B hash. Requests may still return HTTP 200 while a later prefix hit receives the wrong recurrent state.
+For a running request, the fix skips that stale publication at an already computed position. First-time prefill, chunked input and replay after preemption can still save state as usual.
 
-The guard skips stale publication only for RUNNING requests whose publication boundary does not exceed their computed token count. First and chunked prefill, preempted replay and other native paths remain available. Both repairs are gated to vLLM 0.28/0.29, not future releases, and do not replace #464's physical-release ordering.
+## Force a failure, then inspect the state used to resume
 
-## Completion alone is not a correctness test
+The PR tested repeated misses, preemption and retries with the vLLM 0.28 and 0.29 managers. On a single T4 with a tiny random Qwen3.5 hybrid model, it also forced a physical allocation failure after the copy was queued and let the requests run to completion.
 
-Public tests use real 0.28/0.29 managers for waiting, running and preempted requests, repeated misses, references and copy ownership. T4 checks use a tiny random Qwen3.5 hybrid checkpoint and inject real physical allocation misses after a copy is queued, checking complete requests, output tokens, recovery and shutdown.
-
-Ordinary native/elastic comparisons were not universally token-identical. Further isolation checked all six Mamba conv/SSM tensors, the attention prefix and actual copy destinations before the first decode in the remaining 0.29 case: all were exactly equal. A KVCached-disabled native control then reproduced the same scheduling failure and cache recomputation, matching the corresponding fault run's complete outputs.
-
-This separates state corruption from scheduling-induced differences in a near-tied FP16 fixture. HTTP success does not prove state correctness, and different output tokens alone do not prove a bad copy. The evidence qualifies scoped ownership and state recovery, not full-model quality, multi-rank behavior or serving throughput.
-
-[PR #518: reproduction, source and validation boundaries](https://github.com/ovg-project/kvcached/pull/518)
+One 0.29 case produced different tokens from an ordinary run. Before the first decode, all six Mamba state tensors, the attention prefix and the actual copy destinations matched exactly. Reproducing the same scheduling failure and recomputation with KVCached disabled then gave matching full outputs. That comparison separated a change in batch scheduling from corruption during recovery. [Experiments and controls](https://github.com/ovg-project/kvcached/pull/518)
