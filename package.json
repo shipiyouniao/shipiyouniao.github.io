@@ -7,10 +7,10 @@
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "audit:site": "node scripts/audit.mjs",
+    "audit:site": "npm audit --include=dev --audit-level=low",
     "test": "node --test tests/*.test.mjs",
     "test:e2e": "playwright test",
-    "format:check": "prettier --check src scripts tests/audit.test.mjs index.html vite.config.js playwright.config.js package.json tests/browser .github/workflows/pages.yml",
+    "format:check": "prettier --check src index.html vite.config.js playwright.config.js package.json tests/browser .github/workflows/pages.yml",
     "check": "npm run format:check && npm run test && npm run build && npm run test:e2e"
   },
   "dependencies": {
