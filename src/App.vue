@@ -4,7 +4,7 @@ import { ref, watch, watchEffect } from "vue";
 import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 import LanguageSwitcher from "./LanguageSwitcher.vue";
-import { bilibili, contributions } from "./content";
+import { bilibili, notes } from "./content";
 const { t, locale } = useI18n();
 const open = ref(false);
 const route = useRoute();
@@ -22,7 +22,7 @@ const links = [
 ];
 watchEffect(() => {
   document.documentElement.lang = locale.value === "zh" ? "zh-CN" : "en";
-  const article = contributions.find((item) => item.slug === route.params.slug);
+  const article = notes.find((item) => item.slug === route.params.slug);
   const key = links.find(([path]) => path === route.path)?.[1] || "missing";
   document.title = `${article ? t(article.slug + ".title") : t(key)} · ${t("name")}`;
   document

@@ -72,6 +72,14 @@ export const contributions = [
     url: "https://github.com/ovg-project/kvcached/pull/538",
   },
 ];
+export const notes = [
+  ...contributions,
+  {
+    slug: "first-wave-prefix",
+    topics: "prefill Mamba retention TTFT queue 前缀 首轮 排队 首字延迟",
+    date: "2026-11-24",
+  },
+];
 export const bilibili = "https://space.bilibili.com/30915729";
 export const stack = [
   ["frontend", "Vue 3", "TypeScript", "Vite", "Tailwind CSS"],

@@ -4,6 +4,45 @@ import { contributions } from "../../src/content.js";
 for (const locale of ["zh-CN", "en-US"]) {
   test.describe(locale, () => {
     test.use({ locale, permissions: ["clipboard-read", "clipboard-write"] });
+    test("incident note shows the comparison and timeline in the selected language", async ({
+      page,
+    }) => {
+      const zh = locale === "zh-CN";
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.goto("/#/notes/first-wave-prefix");
+      await expect(page.locator(".article-meta")).toContainText(
+        zh ? "故障排查" : "Incident note",
+      );
+      await expect(page.locator("h1")).toHaveText(
+        zh
+          ? "缓存还是冷的，为什么首轮就多算了一条长请求？"
+          : "Why did a cold cache cost us a second long prefill?",
+      );
+      await expect(page.locator(".sequence-canvas svg")).toHaveCount(1);
+      const chart = page.getByRole("img", { name: /186/ });
+      await expect(chart).toHaveAttribute(
+        "src",
+        `/images/first-wave-ttft-${zh ? "zh" : "en"}.png`,
+      );
+      await chart.evaluate((img) => img.decode());
+      await expect(
+        page
+          .locator(".article")
+          .getByText(
+            zh ? "查看原始 PR 与讨论" : "Read the original PR and discussion",
+            { exact: true },
+          ),
+      ).toHaveCount(0);
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      ).toBe(true);
+      await page.screenshot({
+        path: `.preview/article-${locale}-first-wave-prefix.png`,
+        fullPage: true,
+      });
+    });
     for (const { slug } of contributions) {
       test(
         slug + " renders sources, diagrams and copyable code",
