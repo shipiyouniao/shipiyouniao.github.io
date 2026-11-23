@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { contributions } from "../../src/content.js";
+import { notes } from "../../src/content.js";
 
 async function selectLanguage(page, language) {
   await page.getByTestId("language").click();
@@ -48,7 +48,7 @@ for (const language of ["zh-CN", "en-US"]) {
         ).toContainText(zh ? "全皿皆传" : "All-Scratch Kaiden");
         await expect(page.locator(".note-card")).toHaveCount(3);
         for (const slug of [
-          "hybrid-retry",
+          "first-wave-prefix",
           "async-unmap",
           "incremental-eviction",
         ])
@@ -66,13 +66,11 @@ for (const language of ["zh-CN", "en-US"]) {
         });
         await page
           .getByRole("link", {
-            name: zh ? "全部 PR 手记" : "All PR notes",
+            name: zh ? "全部手记" : "All notes",
             exact: true,
           })
           .click();
-        await expect(page.locator(".note-card")).toHaveCount(
-          contributions.length,
-        );
+        await expect(page.locator(".note-card")).toHaveCount(notes.length);
         await page.getByRole("searchbox").fill("51979");
         await expect(page.locator(".note-card")).toHaveCount(1);
         await page.locator(".note-card").click();
@@ -94,7 +92,7 @@ for (const language of ["zh-CN", "en-US"]) {
         });
         await page
           .getByRole("link", {
-            name: zh ? "返回 PR 手记" : "Back to PR notes",
+            name: zh ? "返回手记列表" : "Back to notes",
             exact: true,
           })
           .click();
@@ -171,16 +169,19 @@ test("topic search and printable author name in both languages", async ({
   for (const language of ["en", "zh"]) {
     await page.goto("/#/notes");
     await selectLanguage(page, language);
-    for (const [term, slug] of [
-      ["RPC", "worker-rpc"],
-      ["Mamba", "hybrid-retry"],
-      ["observability", "observability"],
+    for (const [term, slugs] of [
+      ["RPC", ["worker-rpc"]],
+      ["Mamba", ["hybrid-retry", "first-wave-prefix"]],
+      ["retention", ["first-wave-prefix"]],
+      ["observability", ["observability"]],
     ]) {
       await page.getByRole("searchbox").fill(term);
-      await expect(page.locator(".note-card")).toHaveAttribute(
-        "href",
-        "#/notes/" + slug,
-      );
+      await expect(page.locator(".note-card")).toHaveCount(slugs.length);
+      for (const slug of slugs) {
+        await expect(
+          page.locator(`.note-card[href="#/notes/${slug}"]`),
+        ).toBeVisible();
+      }
     }
     await page.goto("/#/about");
     await page.emulateMedia({ media: "print" });

@@ -7,6 +7,7 @@ import {
   ArrowUpRight,
   Code2,
   GitPullRequest,
+  NotebookPen,
   Gamepad2,
   MapPin,
   Search,
@@ -18,7 +19,7 @@ import {
   Music2,
   Play,
 } from "@lucide/vue";
-import { contributions, stack, bilibili } from "./content";
+import { contributions, notes, stack, bilibili } from "./content";
 import RepositoryStats from "./RepositoryStats.vue";
 import { defineAsyncComponent } from "vue";
 const ArticleContent = defineAsyncComponent(
@@ -28,15 +29,16 @@ const { t, tm, rt, locale } = useI18n();
 const route = useRoute();
 const home = computed(() => route.path === "/");
 const article = computed(() =>
-  contributions.find((item) => item.slug === route.params.slug),
+  notes.find((item) => item.slug === route.params.slug),
 );
-const notesByDate = [...contributions].sort((a, b) =>
-  b.date.localeCompare(a.date),
-);
+const notesByDate = [...notes].sort((a, b) => b.date.localeCompare(a.date));
+function noteLabel(item) {
+  return item.number ? `${item.repo} #${item.number}` : t("incidentNote");
+}
 const query = ref("");
 const filteredNotes = computed(() =>
   notesByDate.filter((item) =>
-    `${t(item.slug + ".title")} ${t(item.slug + ".summary")} ${item.repo} ${item.number} ${item.slug} ${item.topics}`
+    `${t(item.slug + ".title")} ${t(item.slug + ".summary")} ${noteLabel(item).replace("#", "")} ${item.slug} ${item.topics}`
       .toLowerCase()
       .includes(
         query.value
@@ -121,7 +123,7 @@ function dateLabel(date) {
       <RouterLink v-if="home" class="text-link" to="/notes"
         >{{ t("allNotes") }} <ArrowUpRight :size="16" /></RouterLink
       ><span v-else class="muted">{{
-        t("notesCount", { count: contributions.length })
+        t("notesCount", { count: notes.length })
       }}</span>
     </div>
     <div v-if="!home" class="filter-bar">
@@ -140,9 +142,11 @@ function dateLabel(date) {
         :to="`/notes/${item.slug}`"
         class="note-card"
         ><div class="note-meta">
-          <GitPullRequest :size="15" /><span
-            >{{ item.repo }} #{{ item.number }}</span
-          >
+          <component
+            :is="item.number ? GitPullRequest : NotebookPen"
+            :size="15"
+          />
+          <span>{{ noteLabel(item) }}</span>
         </div>
         <component :is="home ? 'h3' : 'h2'">{{
           t(item.slug + ".title")
@@ -374,13 +378,18 @@ function dateLabel(date) {
       ><ArrowLeft :size="16" />{{ t("backNotes") }}</RouterLink
     >
     <div class="article-meta">
-      {{ article.repo }} #{{ article.number }} ·
-      {{ t("mergedOn", { date: dateLabel(article.date) }) }}
+      {{ noteLabel(article) }} ·
+      {{
+        article.number
+          ? t("mergedOn", { date: dateLabel(article.date) })
+          : dateLabel(article.date)
+      }}
     </div>
     <h1>{{ t(article.slug + ".title") }}</h1>
     <p class="article-summary">{{ t(article.slug + ".summary") }}</p>
     <ArticleContent :slug="article.slug" />
     <a
+      v-if="article.url"
       class="text-link"
       :href="article.url"
       target="_blank"

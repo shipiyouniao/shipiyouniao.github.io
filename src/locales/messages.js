@@ -1,5 +1,11 @@
 export default {
   zh: {
+    incidentNote: "故障排查",
+    "first-wave-prefix": {
+      title: "缓存还是冷的，为什么首轮就多算了一条长请求？",
+      summary:
+        "我先查了 PCIe，又差点把八个完成请求当成八次抢占。缓存命中量告诉我多算了多少 token，逐请求的计算量分桶才让我数出首轮有几条长 prefill。",
+    },
     "incremental-eviction": {
       title: "释放一个缓存块，为什么要扫一遍整个池子？",
       summary:
@@ -39,15 +45,15 @@ export default {
     language: "语言",
     location: "中国 · 深圳",
     mountainAlt: "森林环绕的山谷，远处是云下的雪山",
-    allNotes: "全部 PR 手记",
+    allNotes: "全部手记",
     notesCount: "{count} 篇手记",
     all: "全部",
     filter: "按项目筛选",
-    search: "搜索 PR",
+    search: "搜索手记",
     merged: "已合入",
     mergedOn: "合入于 {date}",
-    empty: "没有找到匹配的 PR，试试其他关键词。",
-    backNotes: "返回 PR 手记",
+    empty: "没有找到匹配的手记，试试其他关键词。",
+    backNotes: "返回手记列表",
     problem: "问题",
     change: "修改",
     evidence: "验证与边界",
@@ -239,6 +245,12 @@ export default {
     allProjects: "全部项目",
   },
   en: {
+    incidentNote: "Incident note",
+    "first-wave-prefix": {
+      title: "Why did a cold cache cost us a second long prefill?",
+      summary:
+        "I started with PCIe and nearly mistook eight finished requests for eight preemptions. Cache hits told me how much work we repeated. A per-request histogram showed how many long prefills ran in the first batch.",
+    },
     "incremental-eviction": {
       title: "Why scan the whole cache to free one block?",
       summary:
@@ -283,15 +295,15 @@ export default {
     language: "Language",
     location: "Shenzhen, China",
     mountainAlt: "A forested valley with snow-covered peaks beneath the clouds",
-    allNotes: "All PR notes",
+    allNotes: "All notes",
     notesCount: "{count} notes",
     all: "All",
     filter: "Filter by project",
-    search: "Search PR notes",
+    search: "Search notes",
     merged: "Merged",
     mergedOn: "Merged on {date}",
-    empty: "No matching PRs. Try another search.",
-    backNotes: "Back to PR notes",
+    empty: "No matching notes. Try another search.",
+    backNotes: "Back to notes",
     problem: "Problem",
     change: "Change",
     evidence: "Evidence and scope",
